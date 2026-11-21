@@ -1,11 +1,11 @@
 {
-  "name": "aunpaso",
+  "name": "enruta2",
   "version": "1.0.0",
-  "description": "PWA de gestión de pedidos para motorizados, aliados, soporte y administración. La aplicación es estática y se publica en GitHub Pages; Supabase proporciona autenticación, base de datos, RLS y actualizaciones en tiempo real.",
+  "description": "PWA de traslados de personas en carro o moto, con mapas y seguimiento en tiempo real.",
   "main": "app.js",
   "scripts": {
     "android:add": "cap add android",
-    "android:sync": "cap sync android",
+    "android:sync": "node scripts/sync-web.js && cap sync android && node scripts/normalize-cap-config.js",
     "android:open": "cap open android",
     "android:build-debug": "cd android && gradlew.bat assembleDebug",
     "android:build-release": "cd android && gradlew.bat assembleRelease"

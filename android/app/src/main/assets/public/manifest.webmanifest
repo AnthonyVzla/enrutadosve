@@ -1,15 +1,21 @@
 {
-  "name": "A un paso delivery",
-  "short_name": "A un paso",
-  "description": "Gestión de pedidos y entregas",
+  "name": "EnRuta2 · Traslados",
+  "short_name": "EnRuta2",
+  "description": "Traslados seguros de personas en carro o moto",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#111014",
   "theme_color": "#111014",
   "icons": [
     {
-      "src": "./images (1).png",
+      "src": "./enruta2-icon-192.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./enruta2-icon-512.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     }

@@ -1,12 +1,9 @@
 {
-	"__esModule": true,
-	"default": {
-		"appId": "delivery.aunpaso.app",
-		"appName": "A Un Paso",
-		"webDir": "www",
-		"android": {
-			"allowMixedContent": false,
-			"backgroundColor": "#111014"
-		}
-	}
+  "appId": "com.enruta2.app",
+  "appName": "EnRuta2",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#111014"
+  }
 }

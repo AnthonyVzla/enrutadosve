@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "delivery.aunpaso.app"
+    namespace = "com.enruta2.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "delivery.aunpaso.app"
+        applicationId "com.enruta2.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

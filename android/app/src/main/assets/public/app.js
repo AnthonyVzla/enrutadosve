@@ -5,24 +5,23 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const app = document.querySelector("#app");
 const toastNode = document.querySelector("#toast");
-const roleNames = { motorizado: "Motorizado", soporte: "Soporte", administracion: "Administración", aliado: "Aliado", cliente: "Cliente" };
-const statusNames = { pending: "Disponible", assigned: "Asignado", at_store: "En el comercio", in_transit: "En camino", delivered: "Entregado", cancelled: "Cancelado" };
-const state = { session: null, profile: null, screen: "inicio", orders: [], allies: [], profiles: [], courierLocations: [], customerKyc: null, kycSubmissions: [], serviceApplications: [], period: "day", usersRole: "all", usersSearch: "", authMode: "login", toastTimer: null, refreshTimer: null, updateCheckTimer: null, locationRefreshTimer: null, overdueTimer: null, realtime: null, serviceWorkerRegistration: null, updatePending: false, reloadingForUpdate: false, alertsEnabled: false, overdueSoundsEnabled: false, alertAudio: {}, courierLocationWatchId: null, nativeBackgroundLocationWatcherId: null, courierLocationWritePending: false, lastCourierLocationSentAt: 0, latestCourierPosition: null, courierWakeLock: null, courierLocationError: "", monitoringLocationLoadError: false, leafletPromise: null, monitoringMap: null, monitoringMarkers: null, monitoringMapContainer: null, monitoringMapDidFit: false, serviceMap: null, serviceMarkers: {}, serviceMapContainer: null, serviceDraft: { pickup: null, destination: null, activePoint: "pickup", mode: "express", serviceType: "traslado", distanceMeters: null, fee: null }, placeSearchTimers: {}, placeSearchResults: { pickup: [], destination: [] }, lastGeocodeRequestAt: 0, notifiedOrders: new Set(), courierAlarms: new Map(), overdueAlarmTimes: new Map(), pushToken: null, pushListenersReady: false, pushRegistrationResolve: null };
+const roleNames = { motorizado: "Conductor", soporte: "Soporte", administracion: "Administración", aliado: "Cuenta archivada", cliente: "Pasajero" };
+const statusNames = { pending: "Disponible", assigned: "Asignado", at_store: "En la recogida", in_transit: "En camino", delivered: "Finalizado", cancelled: "Cancelado" };
+const VEHICLE_RATES = { carro: { express: 0.9, economico: 0.8 }, moto: { express: 0.4, economico: 0.35 } };
+const RIDE_STATUS_NAMES = { pending: "Buscando conductor", assigned: "Conductor asignado", at_store: "En el punto de recogida", in_transit: "Viaje en curso", delivered: "Viaje finalizado", cancelled: "Cancelado" };
+const state = { session: null, profile: null, screen: "inicio", orders: [], allies: [], profiles: [], courierLocations: [], customerKyc: null, kycSubmissions: [], serviceApplications: [], period: "day", usersRole: "all", usersSearch: "", authMode: "login", toastTimer: null, refreshTimer: null, updateCheckTimer: null, locationRefreshTimer: null, realtime: null, serviceWorkerRegistration: null, updatePending: false, reloadingForUpdate: false, alertsEnabled: false, alertAudio: {}, courierLocationWatchId: null, nativeBackgroundLocationWatcherId: null, courierLocationWritePending: false, lastCourierLocationSentAt: 0, latestCourierPosition: null, courierWakeLock: null, courierLocationError: "", monitoringLocationLoadError: false, leafletPromise: null, heatmapPromise: null, heatmapPluginError: "", monitoringMap: null, monitoringMarkers: null, monitoringDemandHeatLayer: null, monitoringCourierHeatLayer: null, monitoringMapContainer: null, monitoringMapDidFit: false, heatmapRefreshTimer: null, demandHeatPoints: [], demandHeatUpdatedAt: null, demandHeatError: "", heatLayerVisibility: { demand: true, couriers: true }, serviceMap: null, serviceMarkers: {}, serviceDriverMarkers: null, serviceRouteLayer: null, serviceMapContainer: null, serviceAvailabilityTimer: null, availableCourierLocations: [], driverMap: null, driverMapContainer: null, driverMapMarkers: null, driverHeatLayer: null, driverRouteLayer: null, driverLocationMarker: null, driverHeatmapTimer: null, driverRouteKey: null, driverRoutePosition: null, driverRouteUpdatedAt: 0, driverRouteRequestId: 0, driverRouteController: null, driverRouteError: "", driverMapDidFit: false, driverNavigation: localStorage.getItem("enruta-navigation") || "enruta", customerTripMap: null, customerTripMapContainer: null, customerTripMarkers: null, customerTripRouteLayer: null, customerTripLocationTimer: null, customerTripLocation: null, customerTripOrderId: null, customerTripRouteRequestId: 0, tripShareLinks: {}, tripShareOrderId: null, publicTripMap: null, publicTripMarkers: null, publicTripRefreshTimer: null, publicTripOrderId: null, publicTripRouteLayer: null, publicTripRefreshInProgress: false, serviceDraft: { pickup: null, destination: null, activePoint: "pickup", vehicleCategory: "carro", mode: "express", serviceType: "traslado", distanceMeters: null, fee: null, routeCoordinates: null }, placeSearchTimers: {}, placeSearchResults: { pickup: [], destination: [] }, lastGeocodeRequestAt: 0, notifiedOrders: new Set(), courierAlarms: new Map(), pushToken: null, pushListenersReady: false, pushRegistrationResolve: null };
 
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 }
 
 function legalFooter() {
-  return `<footer class="legal-footer">Derechos reservados · A un paso RIF: J-503180226 <span>POWERED BY BAMBAMDEV</span></footer>`;
+  return `<footer class="legal-footer">EnRuta2 <span>POWERED BY BAMBAMDEV</span></footer>`;
 }
 
 function renderAudioActivationPrompt() {
   if (state.profile.role === "motorizado" && !state.alertsEnabled) {
-    return `<aside class="audio-activation" role="status"><div><strong>Activa las alertas de pedidos</strong><p>Habilita el sonido y las notificaciones de pedidos en este dispositivo.</p></div><button class="button primary" data-action="alerts">Activar alertas</button></aside>`;
-  }
-  if (["soporte", "administracion"].includes(state.profile.role) && !state.overdueSoundsEnabled) {
-    return `<aside class="audio-activation" role="status"><div><strong>Activa la alarma de retrasos</strong><p>Habilita el sonido para pedidos que superen los 10 minutos sin llegar al comercio.</p></div><button class="button primary" data-action="overdue-sound">Activar alarma</button></aside>`;
+    return `<aside class="audio-activation" role="status"><div><strong>Activa las alertas de viajes</strong><p>Habilita el sonido y las notificaciones de viajes asignados a tu vehículo.</p></div><button class="button primary" data-action="alerts">Activar alertas</button></aside>`;
   }
   return "";
 }
@@ -63,6 +62,11 @@ function usernameEmail(username) {
 }
 
 async function boot() {
+  const shareToken = new URLSearchParams(window.location.hash.slice(1)).get("share");
+  if (shareToken) {
+    await bootPublicTripShare(shareToken);
+    return;
+  }
   setupServiceWorkerUpdates();
   const { data, error } = await supabase.auth.getSession();
   if (error) return reportError(error);
@@ -76,6 +80,10 @@ async function boot() {
     if (!session) {
       clearInterval(state.refreshTimer);
       stopCourierLocationTracking();
+      destroyMonitoringMap();
+      destroyServiceMap();
+      destroyDriverMap();
+      destroyCustomerTripMap();
       state.session = null;
       state.profile = null;
       renderAuth();
@@ -137,11 +145,16 @@ function applyPendingServiceWorkerUpdate() {
 
 async function loadProfile() {
   stopCourierLocationTracking();
+  destroyMonitoringMap();
   destroyServiceMap();
+  destroyDriverMap();
+  destroyCustomerTripMap();
   state.customerKyc = null;
   state.kycSubmissions = [];
   state.serviceApplications = [];
-  state.serviceDraft = { pickup: null, destination: null, activePoint: "pickup", mode: "express", serviceType: "traslado", distanceMeters: null, fee: null };
+  state.tripShareLinks = {};
+  state.tripShareOrderId = null;
+  state.serviceDraft = { pickup: null, destination: null, activePoint: "pickup", vehicleCategory: "carro", mode: "express", serviceType: "traslado", distanceMeters: null, fee: null, routeCoordinates: null };
   state.placeSearchResults = { pickup: [], destination: [] };
   const { data, error } = await supabase.from("profiles").select("*").eq("id", state.session.user.id).maybeSingle();
   if (error) return reportError(error);
@@ -171,10 +184,6 @@ async function loadProfile() {
   if (state.profile.role === "motorizado" && state.profile.online) startCourierLocationTracking();
   startRealtime();
   clearInterval(state.refreshTimer);
-  clearInterval(state.overdueTimer);
-  if (["soporte", "administracion"].includes(state.profile.role)) {
-    state.overdueTimer = setInterval(updateOverdueClocks, 1000);
-  }
   state.refreshTimer = setInterval(async () => {
     if (state.profile.role === "motorizado" && state.profile.online) {
       const { error: heartbeatError } = await supabase.rpc("heartbeat_courier");
@@ -186,7 +195,21 @@ async function loadProfile() {
 }
 
 function renderIfSafe() {
-  if (["crear", "servicio"].includes(state.screen)) return;
+  if (state.profile?.role === "cliente" && state.screen === "servicio") {
+    refreshCustomerServiceMarkers();
+    if (activeCustomerTrip()) void refreshCustomerTripLocation();
+    return;
+  }
+  if (state.profile?.role === "motorizado" && ["activos", "curso"].includes(state.screen)) {
+    refreshCourierScreenOrders();
+    refreshDriverMap();
+    return;
+  }
+  if (state.profile?.role === "cliente" && state.screen === "historial_cliente") {
+    refreshCustomerHistoryScreen();
+    return;
+  }
+  if (state.screen === "crear") return;
   if (state.screen === "monitoreo") {
     refreshMonitoringView();
     return;
@@ -322,8 +345,8 @@ async function startNativeBackgroundLocationTracking() {
   state.courierLocationError = "";
   try {
     state.nativeBackgroundLocationWatcherId = await nativeLocation.addWatcher({
-      backgroundMessage: "Ubicación activa para entregas. Cambia a OFF para detenerla.",
-      backgroundTitle: "A un paso · GPS activo",
+      backgroundMessage: "Ubicación activa para viajes. Cambia a OFF para detenerla.",
+      backgroundTitle: "EnRuta2 · GPS activo",
       requestPermissions: true,
       stale: false,
       distanceFilter: 10
@@ -379,13 +402,13 @@ function renderAuth() {
   const isRegister = state.authMode === "register";
   app.innerHTML = `
     <div class="auth-page"><section class="auth-shell"><div class="auth-card">
-      <img class="brand-logo" src="./images (1).png" alt="A un paso delivery">
-      <p class="eyebrow">GESTIÓN DE ENTREGAS</p>
+      <img class="brand-logo" src="./enruta2-logo.png" alt="EnRuta2">
+      <p class="eyebrow">TRASLADOS DE PERSONAS</p>
       <h1>${isRegister ? "Crea tu cuenta" : "Bienvenido"}</h1>
       <p class="muted">${isRegister ? "Crea tu cuenta de cliente y luego verifica tu perfil para solicitar servicios." : "Ingresa a tu cuenta para continuar."}</p>
       <form id="auth-form" class="stack">
         ${isRegister ? `<div class="stack"><label>Nombre<input name="firstName" autocomplete="given-name" required></label><label>Apellido<input name="lastName" autocomplete="family-name" required></label><label>Teléfono<input name="phone" type="tel" autocomplete="tel" required></label></div>` : ""}
-        <label>Usuario<input name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}" title="Usa de 3 a 32 letras, números, punto, guion o guion bajo." autocapitalize="none"></label>
+        <label>Usuario<input name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.\\-]{3,32}" title="Usa de 3 a 32 letras, números, punto, guion o guion bajo." autocapitalize="none"></label>
         <label>Contraseña<input name="password" type="password" autocomplete="${isRegister ? "new-password" : "current-password"}" required minlength="6"></label>
         <p id="auth-error" class="error hidden" role="alert"></p>
         <button class="button primary full" id="auth-submit">${isRegister ? "Crear cuenta" : "Iniciar sesión"}</button>
@@ -446,8 +469,8 @@ async function submitAuth(event) {
 function renderPending() {
   const suspended = state.profile?.suspended;
   app.innerHTML = `<div class="auth-page"><section class="auth-shell"><div class="auth-card">
-    <img class="brand-logo" src="./images (1).png" alt="A un paso delivery">
-    <p class="eyebrow">A UN PASO DELIVERY</p><h1>${suspended ? "Cuenta suspendida" : "Solicitud recibida"}</h1>
+    <img class="brand-logo" src="./enruta2-logo.png" alt="EnRuta2">
+    <p class="eyebrow">ENRUTA2</p><h1>${suspended ? "Cuenta suspendida" : "Solicitud recibida"}</h1>
     <p class="muted">${suspended ? "Tu acceso está suspendido. Comunícate con administración." : "Tu cuenta aún no está habilitada. Podrás ingresar cuando administración apruebe tu usuario y asigne un rol."}</p>
     <button class="button subtle full" id="logout-button">Cerrar sesión</button>
   </div></section>${legalFooter()}</div>`;
@@ -458,6 +481,7 @@ async function refreshData(quiet) {
   if (!state.profile || !state.session) return;
   const { data: orders, error: orderError } = await supabase.from("orders")
     .select("*, allies(name, location_url), courier:profiles!orders_courier_id_fkey(full_name, username, phone, earnings_percentage), creator:profiles!orders_created_by_fkey(full_name)")
+    .eq("service_type", "traslado")
     .order("created_at", { ascending: false }).limit(500);
   if (orderError) {
     if (!quiet) reportError(orderError);
@@ -479,7 +503,7 @@ async function refreshData(quiet) {
   if (["administracion", "soporte", "aliado"].includes(state.profile.role)) {
     const [allyResult, profileResult] = await Promise.all([
       supabase.from("allies").select("*").order("name"),
-      supabase.from("profiles")      .select("id, username, full_name, phone, role, ally_id, earnings_percentage, approved, suspended, online, last_seen_at, updated_at").order("full_name")
+      supabase.from("profiles").select("id, username, full_name, phone, role, ally_id, vehicle_category, earnings_percentage, approved, suspended, online, last_seen_at, updated_at").order("full_name")
     ]);
     if (allyResult.error || profileResult.error) {
       if (!quiet) reportError(allyResult.error || profileResult.error);
@@ -548,7 +572,7 @@ function activeCouriers() {
 }
 
 function couriersForOrder(order) {
-  const couriers = activeCouriers();
+  const couriers = activeCouriers().filter((profile) => (profile.vehicle_category || "moto") === (order.vehicle_category || "moto"));
   return order.service_type === "traslado"
     ? couriers.filter((profile) => !state.orders.some((activeOrder) =>
       activeOrder.courier_id === profile.id && ["assigned", "at_store", "in_transit"].includes(activeOrder.status)
@@ -565,34 +589,39 @@ function refreshActiveCourierOptions() {
   const staleSelection = selectedId && !selectedIsActive
     ? state.profiles.find((profile) => profile.id === selectedId)
     : null;
-  select.innerHTML = `<option value="">Ninguno — pedido visible para motorizados activos</option>${staleSelection
+  select.innerHTML = `<option value="">Ninguno — viaje visible para conductores activos</option>${staleSelection
     ? `<option value="${staleSelection.id}">⚠ ${escapeHtml(staleSelection.full_name)} ya no está activo</option>`
     : ""}${couriers.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.full_name)} (@${escapeHtml(profile.username)})</option>`).join("")}`;
   if (selectedId) select.value = selectedId;
 }
 
 const navItems = {
-  motorizado: [["inicio", "Resumen"], ["activos", "Pedidos activos"], ["curso", "Pedido en curso"], ["entregados", "Entregados"]],
-  soporte: [["inicio", "Resumen"], ["crear", "Crear pedido"], ["pendientes", "Pedidos pendientes"], ["pedidos", "Pedidos"], ["entregados", "Finalizados"], ["motorizados", "Motorizados activos"], ["monitoreo", "Monitoreo"], ["aliados", "Aliados"]],
-  administracion: [["inicio", "Resumen"], ["pendientes", "Pedidos pendientes"], ["pedidos", "Pedidos"], ["entregados", "Finalizados"], ["motorizados", "Motorizados activos"], ["monitoreo", "Monitoreo"], ["verificaciones", "Verificaciones"], ["aspirantes", "Aspirantes"], ["usuarios", "Usuarios"], ["aliados", "Aliados"], ["reportes", "Reportes"], ["metricas", "Métricas"]],
-  aliado: [["crear", "Crear pedido"], ["mis_pedidos", "Pedidos en curso"], ["historial", "Historial"]],
-  cliente: [["servicio", "Realizar servicio"], ["historial_cliente", "Historial"], ["perfil_cliente", "Perfil"]]
+  motorizado: [["activos", "Mapa y viajes"], ["curso", "Viaje en curso"], ["entregados", "Historial"]],
+  soporte: [["inicio", "Resumen"], ["pendientes", "Viajes pendientes"], ["pedidos", "Viajes"], ["entregados", "Finalizados"], ["motorizados", "Conductores activos"], ["monitoreo", "Monitoreo"]],
+  administracion: [["inicio", "Resumen"], ["pendientes", "Viajes pendientes"], ["pedidos", "Viajes"], ["entregados", "Finalizados"], ["motorizados", "Conductores activos"], ["monitoreo", "Monitoreo"], ["verificaciones", "Verificaciones"], ["aspirantes", "Conductores"], ["usuarios", "Usuarios"], ["reportes", "Reportes"], ["metricas", "Métricas"]],
+  aliado: [],
+  cliente: [["servicio", "Pedir traslado"], ["historial_cliente", "Mis viajes"], ["perfil_cliente", "Perfil"]]
 };
 
 function renderApp() {
   if (!state.profile?.role) return renderPending();
+  if (state.profile.role === "aliado") {
+    app.innerHTML = `<div class="auth-page"><section class="auth-shell"><div class="auth-card"><img class="brand-logo" src="./enruta2-logo.png" alt="EnRuta2"><p class="eyebrow">ENRUTA2</p><h1>Cuenta archivada</h1><p class="muted">La plataforma ahora gestiona únicamente traslados de personas. Tus datos históricos se conservan; esta cuenta ya no puede crear pedidos.</p><button class="button subtle full" data-action="logout">Cerrar sesión</button></div></section>${legalFooter()}</div>`;
+    app.querySelector('[data-action="logout"]').addEventListener("click", signOut);
+    return;
+  }
   const items = navItems[state.profile.role] || [];
   if (!items.some(([key]) => key === state.screen)) state.screen = items[0]?.[0] || "inicio";
   const nav = items.map(([key, label]) => `<button class="nav-button ${state.screen === key ? "active" : ""}" data-screen="${key}">${label}</button>`).join("");
   app.innerHTML = `<div class="app-page"><div class="layout">
     <aside class="sidebar">
-      <div class="sidebar-brand"><img src="./images (1).png" alt=""><div><strong>A un paso<br>delivery</strong><span>${roleNames[state.profile.role]}</span></div></div>
+      <div class="sidebar-brand"><img src="./enruta2-logo.png" alt=""><div><strong>EnRuta2</strong><span>${roleNames[state.profile.role]}</span></div></div>
       <nav class="nav-list">${nav}</nav>
       <div class="sidebar-bottom"><div class="user-summary"><strong>${escapeHtml(state.profile.full_name)}</strong><span>@${escapeHtml(state.profile.username)} · ${roleNames[state.profile.role]}</span></div><button class="button subtle full" data-action="logout">Cerrar sesión</button></div>
     </aside>
     <main class="main">
-      <header class="topbar"><div><div class="mobile-brand"><img src="./images (1).png" alt=""><strong>A un paso delivery</strong></div><h1>${escapeHtml(titleFor(state.screen))}</h1><p>${new Intl.DateTimeFormat("es-CO", { dateStyle: "full" }).format(new Date())}</p></div>
-        ${state.profile.role === "motorizado" ? `<div class="header-actions"><button class="button subtle small" data-action="alerts" aria-pressed="${state.alertsEnabled}">${state.alertsEnabled ? "Desactivar alertas" : "Activar alertas"}</button><label class="switch-row"><span class="muted">${state.profile.online ? "Activo" : "Desconectado"}</span><span class="switch"><input type="checkbox" data-action="online" ${state.profile.online ? "checked" : ""} aria-label="Disponibilidad"><span></span></span></label><button class="button subtle small mobile-logout" data-action="logout">Cerrar sesión</button></div>` : `<div class="header-actions">${["soporte", "administracion"].includes(state.profile.role) ? `<button class="button subtle small" data-action="overdue-sound" aria-pressed="${state.overdueSoundsEnabled}">${state.overdueSoundsEnabled ? "Alarma activada" : "Activar alarma"}</button><span class="badge green">${countOnline()} motorizados activos</span>` : ""}${["soporte", "administracion", "aliado", "cliente"].includes(state.profile.role) ? `<button class="button subtle small mobile-logout" data-action="logout">Cerrar sesión</button>` : ""}</div>`}
+      <header class="topbar"><div><div class="mobile-brand"><img src="./enruta2-logo.png" alt=""><strong>EnRuta2</strong></div><h1>${escapeHtml(titleFor(state.screen))}</h1><p>${new Intl.DateTimeFormat("es-CO", { dateStyle: "full" }).format(new Date())}</p></div>
+        ${state.profile.role === "motorizado" ? `<div class="header-actions"><button class="button subtle small" data-action="alerts" aria-pressed="${state.alertsEnabled}">${state.alertsEnabled ? "Desactivar alertas" : "Activar alertas"}</button><label class="switch-row"><span class="muted">${state.profile.online ? "Disponible" : "Desconectado"}</span><span class="switch"><input type="checkbox" data-action="online" ${state.profile.online ? "checked" : ""} aria-label="Disponibilidad"><span></span></span></label><button class="button subtle small mobile-logout" data-action="logout">Cerrar sesión</button></div>` : `<div class="header-actions">${["soporte", "administracion"].includes(state.profile.role) ? `<span class="badge green">${countOnline()} conductores activos</span>` : ""}${["soporte", "administracion", "cliente"].includes(state.profile.role) ? `<button class="button subtle small mobile-logout" data-action="logout">Cerrar sesión</button>` : ""}</div>`}
       </header>
       ${renderAudioActivationPrompt()}
       <section id="screen-content">${renderScreen()}</section>
@@ -600,14 +629,10 @@ function renderApp() {
     <nav class="mobile-nav">${nav}</nav>
   </div>${legalFooter()}</div>`;
   app.querySelectorAll("[data-screen]").forEach((button) => button.addEventListener("click", () => {
-    if (state.screen === "monitoreo" && button.dataset.screen !== "monitoreo" && state.monitoringMap) {
-      state.monitoringMap.remove();
-      state.monitoringMap = null;
-      state.monitoringMarkers = null;
-      state.monitoringMapContainer = null;
-      state.monitoringMapDidFit = false;
-    }
+    if (state.screen === "monitoreo" && button.dataset.screen !== "monitoreo") destroyMonitoringMap();
     if (state.screen === "servicio" && button.dataset.screen !== "servicio") destroyServiceMap();
+    if (["activos", "curso"].includes(state.screen) && !["activos", "curso"].includes(button.dataset.screen)) destroyDriverMap();
+    if (["servicio", "historial_cliente"].includes(state.screen) && !["servicio", "historial_cliente"].includes(button.dataset.screen)) destroyCustomerTripMap();
     state.screen = button.dataset.screen;
     renderApp();
     applyPendingServiceWorkerUpdate();
@@ -617,15 +642,20 @@ function renderApp() {
   if (onlineToggle) onlineToggle.addEventListener("change", toggleOnline);
   const alertsButton = app.querySelector('[data-action="alerts"]');
   if (alertsButton) alertsButton.addEventListener("click", toggleCourierAlerts);
-  const overdueSoundButton = app.querySelector('[data-action="overdue-sound"]');
-  if (overdueSoundButton) overdueSoundButton.addEventListener("click", enableOverdueSounds);
+  app.querySelectorAll("[data-heat-toggle]").forEach((button) => button.addEventListener("click", () => {
+    const layer = button.dataset.heatToggle;
+    state.heatLayerVisibility[layer] = !state.heatLayerVisibility[layer];
+    button.setAttribute("aria-pressed", String(state.heatLayerVisibility[layer]));
+    button.classList.toggle("active", state.heatLayerVisibility[layer]);
+    refreshMonitoringMap();
+  }));
   const activationButton = app.querySelector(".audio-activation [data-action]");
-  if (activationButton) {
-    activationButton.addEventListener("click", activationButton.dataset.action === "alerts" ? toggleCourierAlerts : enableOverdueSounds);
-  }
+  if (activationButton) activationButton.addEventListener("click", toggleCourierAlerts);
   bindScreenActions();
   if (state.screen === "monitoreo") void initializeMonitoringMap();
   if (state.screen === "servicio" && state.profile.role === "cliente") void initializeServiceMap();
+  if (["activos", "curso"].includes(state.screen) && state.profile.role === "motorizado") void initializeDriverMap();
+  if (["servicio", "historial_cliente"].includes(state.screen) && state.profile.role === "cliente") void initializeCustomerTripMap();
   if (state.screen === "perfil_cliente" && state.profile.role === "cliente" && state.profile.avatar_path) void loadCustomerAvatar();
 }
 
@@ -654,9 +684,7 @@ async function toggleCourierAlerts() {
 }
 
 function alertAudioFor(kind) {
-  const source = kind === "overdue"
-    ? "./classic-danger-alarm.mp3"
-    : "./email-notification-message-ring.wav";
+  const source = "./email-notification-message-ring.wav";
   if (!state.alertAudio[kind]) {
     const audio = new Audio(source);
     audio.preload = "auto";
@@ -680,7 +708,7 @@ async function playAlertAudio(kind) {
     await audio.play();
   } catch (error) {
     console.error(`No se pudo reproducir el audio ${kind}:`, error);
-    showToast("El navegador bloqueó el sonido. Pulsa Activar alertas o Activar alarma para habilitar el audio.", true);
+    showToast("El navegador bloqueó el sonido. Pulsa Activar alertas para habilitarlo.", true);
   }
 }
 
@@ -894,10 +922,9 @@ async function startCourierAlarm(kind, order) {
 }
 
 async function notifyCourier(kind, order) {
-  const allyName = order.allies?.name || "Aliado";
   const message = kind === "assigned"
-    ? `Tienes un pedido asignado de ${allyName}.`
-    : `Nuevo pedido disponible de ${allyName}.`;
+    ? `Tienes un viaje asignado.`
+    : `Hay un nuevo viaje disponible para tu vehículo.`;
   showToast(message);
   await startCourierAlarm(kind, order);
 }
@@ -913,7 +940,7 @@ function emitCourierNotification(kind, order) {
 }
 
 function titleFor(screen) {
-  return ({ inicio: "Resumen", activos: "Pedidos activos", curso: "Pedido en curso", entregados: "Pedidos entregados", crear: "Crear pedido", pedidos: "Pedidos", pendientes: "Pedidos pendientes", mis_pedidos: "Pedidos en curso", historial: "Historial", motorizados: "Motorizados activos", monitoreo: "Monitoreo", aliados: "Aliados", usuarios: "Usuarios", reportes: "Reportes", metricas: "Métricas", verificaciones: "Verificaciones KYC", aspirantes: "Aspirantes", servicio: "Realizar servicio", historial_cliente: "Historial de servicios", perfil_cliente: "Mi perfil" })[screen] || "A un paso delivery";
+  return ({ inicio: "Resumen", activos: "Viajes disponibles", curso: "Viaje en curso", entregados: "Viajes finalizados", crear: "Crear viaje", pedidos: "Viajes", pendientes: "Viajes pendientes", mis_pedidos: "Viajes en curso", historial: "Historial", motorizados: "Conductores activos", monitoreo: "Monitoreo", aliados: "Cuentas archivadas", usuarios: "Usuarios", reportes: "Reportes", metricas: "Métricas", verificaciones: "Verificaciones KYC", aspirantes: "Conductores", servicio: "Solicitar un viaje", historial_cliente: "Mis viajes", perfil_cliente: "Mi perfil" })[screen] || "EnRuta2";
 }
 
 function countOnline() {
@@ -959,22 +986,22 @@ function renderScreen() {
 
 function renderPendingOrders() {
   const orders = state.orders.filter((order) => order.status === "pending" && !order.courier_id);
-  return `<p class="muted">Pedidos creados por aliados y pedidos aún sin motorizado. Asígnalos o libéralos para que los motorizados activos puedan tomarlos.</p><div class="list">${renderOrderCards(orders, "pending")}</div>`;
+  return `<p class="muted">Viajes que esperan revisión. Asígnalos o libéralos para que los conductores conectados con el vehículo correspondiente puedan tomarlos.</p><div class="list">${renderOrderCards(orders, "pending")}</div>`;
 }
 
 function renderAllyOrders(history) {
   const orders = state.orders.filter((order) => history ? order.status === "delivered" : !["delivered", "cancelled"].includes(order.status));
-  return `<p class="muted">${history ? "Pedidos entregados de tu aliado." : "Pedidos en espera de soporte, asignados o en curso."}</p><div class="list">${renderOrderCards(orders, history ? "completed" : "ally")}</div>`;
+  return `<p class="muted">${history ? "Viajes finalizados de tu cuenta." : "Viajes en espera de soporte, asignados o en curso."}</p><div class="list">${renderOrderCards(orders, history ? "completed" : "ally")}</div>`;
 }
 
 function renderActiveCouriers() {
   const couriers = activeCouriers();
-  if (!couriers.length) return `<div class="empty">No hay motorizados activos en este momento.</div>`;
+  if (!couriers.length) return `<div class="empty">No hay conductores activos en este momento.</div>`;
   return `<p class="muted">Estado de disponibilidad de cada motorizado conectado.</p><div class="list">${couriers.map((profile) => {
     const currentOrders = state.orders.filter((order) => order.courier_id === profile.id && ["assigned", "at_store", "in_transit"].includes(order.status));
     const isBusy = currentOrders.length > 0;
-    const orderDetails = currentOrders.map((order) => `${escapeHtml(order.allies?.name || "Aliado")} · ${escapeHtml(order.client_name)} (#${order.id.slice(0, 8)}) — ${statusNames[order.status]}`).join("<br>");
-    return `<article class="card order-top"><div><h3>${escapeHtml(profile.full_name)}</h3><p>@${escapeHtml(profile.username)} · ${escapeHtml(profile.phone || "Sin teléfono")}</p><p class="muted">Última conexión: ${dateTime(profile.last_seen_at)}</p>${isBusy ? `<p class="courier-work"><strong>Pedido${currentOrders.length > 1 ? "s" : ""} en curso:</strong><br>${orderDetails}</p>` : ""}</div><span class="badge ${isBusy ? "orange" : "green"}">${isBusy ? "Ocupado" : "Disponible"}</span></article>`;
+    const orderDetails = currentOrders.map((order) => `${escapeHtml(order.client_name)} (#${order.id.slice(0, 8)}) — ${RIDE_STATUS_NAMES[order.status]}`).join("<br>");
+    return `<article class="card order-top"><div><h3>${escapeHtml(profile.full_name)}</h3><p>@${escapeHtml(profile.username)} · ${escapeHtml(profile.phone || "Sin teléfono")}</p><p class="muted">Última conexión: ${dateTime(profile.last_seen_at)}</p>${isBusy ? `<p class="courier-work"><strong>Viaje${currentOrders.length > 1 ? "s" : ""} en curso:</strong><br>${orderDetails}</p>` : ""}</div><span class="badge ${isBusy ? "orange" : "green"}">${isBusy ? "Ocupado" : "Disponible"}</span></article>`;
   }).join("")}</div>`;
 }
 
@@ -986,23 +1013,28 @@ function monitoringCouriers() {
     const location = positions.get(profile.id);
     const locationIsFresh = location && new Date(location.updated_at).getTime() > freshAfter;
     const busy = currentOrders.length > 0;
-    const orderDescription = currentOrders.map((order) => `${escapeHtml(order.allies?.name || "Aliado")} · #${order.id.slice(0, 8)} · ${statusNames[order.status]}`).join("<br>");
+    const orderDescription = currentOrders.map((order) => `#${order.id.slice(0, 8)} · ${RIDE_STATUS_NAMES[order.status]}`).join("<br>");
     const positionDescription = locationIsFresh
       ? `Ubicación actualizada ${dateTime(location.updated_at)}${location.accuracy ? ` · precisión ±${Math.round(location.accuracy)} m` : ""}`
       : "Esperando ubicación GPS del teléfono";
-    return `<article class="card monitoring-courier"><div><h3>${escapeHtml(profile.full_name)}</h3><p>${escapeHtml(profile.phone || "Sin teléfono")} · ${positionDescription}</p>${busy ? `<p class="courier-work"><strong>Ocupado:</strong><br>${orderDescription}</p>` : `<p class="courier-work">Disponible para tomar pedidos</p>`}</div><span class="badge ${busy ? "orange" : "green"}">${busy ? "Ocupado" : "Disponible"}</span></article>`;
+    return `<article class="card monitoring-courier"><div><h3>${escapeHtml(profile.full_name)}</h3><p>${escapeHtml(profile.phone || "Sin teléfono")} · ${positionDescription}</p>${busy ? `<p class="courier-work"><strong>Ocupado:</strong><br>${orderDescription}</p>` : `<p class="courier-work">Disponible para tomar viajes</p>`}</div><span class="badge ${busy ? "orange" : "green"}">${busy ? "Ocupado" : "Disponible"}</span></article>`;
   }).join("");
 }
 
 function renderMonitoring() {
   const couriers = activeCouriers();
-  return `<p class="muted">Ubicaciones recientes de motorizados conectados. La posición se comparte mientras el motorizado está en línea y autorizó el GPS.</p>
+  return `<p class="muted">Ubicaciones recientes de conductores conectados. La posición se comparte mientras el conductor está en línea y autorizó el GPS.</p>
     <p id="monitoring-data-warning" class="error ${state.monitoringLocationLoadError ? "" : "hidden"}">No se pudo consultar la tabla de ubicaciones. Ejecuta la actualización de <code>supabase/schema.sql</code> y verifica los permisos.</p>
+    <div class="heat-layer-controls" role="group" aria-label="Capas de zona de calor">
+      <button class="button small ${state.heatLayerVisibility.demand ? "active" : ""}" type="button" data-heat-toggle="demand" aria-pressed="${state.heatLayerVisibility.demand}">Demanda (24 h)</button>
+      <button class="button small ${state.heatLayerVisibility.couriers ? "active" : ""}" type="button" data-heat-toggle="couriers" aria-pressed="${state.heatLayerVisibility.couriers}">Conductores disponibles</button>
+    </div>
     <div id="monitoring-map" class="monitoring-map" role="application" aria-label="Mapa de motorizados"></div>
+    <p id="monitoring-heatmap-message" class="fine-print">Cargando zonas de calor...</p>
     <p id="monitoring-map-message" class="fine-print">${couriers.length ? "Cargando mapa y ubicaciones..." : "No hay motorizados conectados ahora."}</p>
     ${state.courierLocationError ? `<p class="error">${escapeHtml(state.courierLocationError)}</p>` : ""}
     <div id="monitoring-couriers" class="list">${monitoringCouriers() || `<div class="empty">No hay motorizados conectados en este momento.</div>`}</div>
-    <p class="fine-print">El mapa usa Leaflet y datos cartográficos de OpenStreetMap. El seguimiento se detiene cuando el motorizado cambia a OFF o cierra sesión.</p>`;
+    <p class="fine-print">La zona de demanda usa recogidas de las últimas 24 horas y se actualiza cada 30 minutos; las ubicaciones de motorizados activos se refrescan en tiempo real. El mapa usa Leaflet y datos de OpenStreetMap.</p>`;
 }
 
 function loadLeaflet() {
@@ -1029,18 +1061,571 @@ function loadLeaflet() {
   return state.leafletPromise;
 }
 
+function loadLeafletHeat() {
+  if (window.L?.heatLayer) return Promise.resolve();
+  if (state.heatmapPromise) return state.heatmapPromise;
+  state.heatmapPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js";
+    script.async = true;
+    script.onload = () => {
+      if (window.L?.heatLayer) resolve();
+      else {
+        state.heatmapPromise = null;
+        reject(new Error("La extensión de zonas de calor no quedó disponible."));
+      }
+    };
+    script.onerror = () => {
+      state.heatmapPromise = null;
+      reject(new Error("No se pudo cargar la extensión de zonas de calor. Comprueba la conexión a internet."));
+    };
+    document.head.appendChild(script);
+  });
+  return state.heatmapPromise;
+}
+
+function currentCourierCoordinates() {
+  const coordinates = state.latestCourierPosition?.coords;
+  if (!coordinates) return null;
+  const latitude = Number(coordinates.latitude);
+  const longitude = Number(coordinates.longitude);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : null;
+}
+
+function activeCourierTrip() {
+  return state.orders.find((order) => order.service_type === "traslado"
+    && order.courier_id === state.profile?.id
+    && ["assigned", "at_store", "in_transit"].includes(order.status)) || null;
+}
+
+function destroyDriverMap() {
+  clearInterval(state.driverHeatmapTimer);
+  state.driverHeatmapTimer = null;
+  state.driverRouteController?.abort();
+  state.driverRouteController = null;
+  state.driverRouteRequestId += 1;
+  state.driverMap?.remove();
+  state.driverMap = null;
+  state.driverMapContainer = null;
+  state.driverMapMarkers = null;
+  state.driverHeatLayer = null;
+  state.driverRouteLayer = null;
+  state.driverLocationMarker = null;
+  state.driverRouteKey = null;
+  state.driverRoutePosition = null;
+  state.driverRouteUpdatedAt = 0;
+  state.driverRouteError = "";
+  state.driverMapDidFit = false;
+}
+
+async function initializeDriverMap() {
+  const container = document.querySelector("#driver-map");
+  if (!container || state.profile?.role !== "motorizado") return;
+  try {
+    const leaflet = await loadLeaflet();
+    let heatAvailable = true;
+    try {
+      await loadLeafletHeat();
+    } catch (error) {
+      heatAvailable = false;
+      state.heatmapPluginError = error.message;
+      console.error("No se pudo cargar la zona de calor del conductor:", error);
+    }
+    if (!container.isConnected || !["activos", "curso"].includes(state.screen)) return;
+    if (state.driverMap && state.driverMapContainer !== container) destroyDriverMap();
+    if (!state.driverMap) {
+      state.driverMapContainer = container;
+      const position = currentCourierCoordinates();
+      state.driverMap = leaflet.map(container).setView(position ? [position.latitude, position.longitude] : [10.2447, -67.5958], 13);
+      leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
+      }).addTo(state.driverMap);
+      if (heatAvailable) {
+        state.driverHeatLayer = leaflet.heatLayer([], {
+          radius: 32, blur: 24, minOpacity: 0.2, maxZoom: 16,
+          gradient: { 0.2: "#42d392", 0.5: "#ffe066", 0.8: "#ff9f43", 1: "#ff4059" }
+        }).addTo(state.driverMap);
+      }
+      state.driverMapMarkers = leaflet.layerGroup().addTo(state.driverMap);
+      void refreshDemandHeatPoints();
+      clearInterval(state.driverHeatmapTimer);
+      state.driverHeatmapTimer = setInterval(() => void refreshDemandHeatPoints(), 30 * 60 * 1000);
+    }
+    refreshDriverMap();
+    setTimeout(() => state.driverMap?.invalidateSize(), 0);
+  } catch (error) {
+    console.error("No se pudo inicializar el mapa del conductor:", error);
+    const message = document.querySelector("#driver-map-message");
+    if (message) message.textContent = `No se pudo cargar el mapa: ${error.message}`;
+  }
+}
+
+function refreshDriverMap() {
+  if (!state.driverMap || !state.driverMapMarkers) return;
+  const leaflet = window.L;
+  const message = document.querySelector("#driver-map-message");
+  state.driverHeatLayer?.setLatLngs(state.demandHeatPoints);
+  state.driverMapMarkers.clearLayers();
+  const bounds = [];
+  const position = currentCourierCoordinates();
+  const activeTrip = activeCourierTrip();
+  const availableTrips = state.orders.filter((order) => order.service_type === "traslado"
+    && order.status === "pending" && order.released !== false
+    && (order.vehicle_category || "moto") === (state.profile.vehicle_category || "moto"));
+
+  for (const trip of availableTrips) {
+    const latitude = Number(trip.pickup_latitude);
+    const longitude = Number(trip.pickup_longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+    leaflet.circleMarker([latitude, longitude], {
+      radius: 8, color: "#fff", weight: 2, fillColor: "#ff9f43", fillOpacity: 0.95
+    }).bindPopup(`Viaje disponible · ${formatMoney(courierEarnings(trip), trip.currency)} para ti`)
+      .addTo(state.driverMapMarkers);
+    bounds.push([latitude, longitude]);
+  }
+
+  if (position) {
+    leaflet.circleMarker([position.latitude, position.longitude], {
+      radius: 9, color: "#fff", weight: 3, fillColor: "#18795b", fillOpacity: 1
+    }).bindPopup("Tu ubicación actual").addTo(state.driverMapMarkers);
+    bounds.push([position.latitude, position.longitude]);
+  }
+
+  if (activeTrip) {
+    const target = activeTrip.status === "assigned"
+      ? [Number(activeTrip.pickup_latitude), Number(activeTrip.pickup_longitude)]
+      : [Number(activeTrip.destination_latitude), Number(activeTrip.destination_longitude)];
+    if (target.every(Number.isFinite)) bounds.push([target[0], target[1]]);
+    void updateDriverTripRoute(activeTrip, position);
+  } else {
+    state.driverRouteController?.abort();
+    state.driverRouteController = null;
+    state.driverRouteKey = null;
+    state.driverRouteLayer?.remove();
+    state.driverRouteLayer = null;
+  }
+
+  if (bounds.length && !state.driverMapDidFit) {
+    state.driverMap.fitBounds(bounds, { padding: [35, 35], maxZoom: 14 });
+    state.driverMapDidFit = true;
+  }
+  if (message) {
+    const heatStatus = state.heatmapPluginError
+      ? `Zona de calor no disponible: ${state.heatmapPluginError}`
+      : state.demandHeatError
+        ? `No se pudo cargar la demanda: ${state.demandHeatError}`
+        : `${state.demandHeatPoints.length} zona(s) de demanda en 24 h`;
+    message.textContent = `${heatStatus} · ${availableTrips.length} viaje(s) disponible(s) para tu vehículo.`
+        + (activeTrip ? ` Ruta activa: ${activeTrip.status === "assigned" ? "hacia la recogida" : "hacia el destino"}.` : "")
+        + (state.driverRouteError ? ` ${state.driverRouteError}` : "");
+  }
+}
+
+async function updateDriverTripRoute(trip, position) {
+  const isPickup = trip.status === "assigned";
+  const targetLatitude = Number(isPickup ? trip.pickup_latitude : trip.destination_latitude);
+  const targetLongitude = Number(isPickup ? trip.pickup_longitude : trip.destination_longitude);
+  if (!Number.isFinite(targetLatitude) || !Number.isFinite(targetLongitude)) return;
+  const from = position || (isPickup
+    ? null
+    : { latitude: Number(trip.pickup_latitude), longitude: Number(trip.pickup_longitude) });
+  if (!from || !Number.isFinite(from.latitude) || !Number.isFinite(from.longitude)) return;
+  const key = `${trip.id}:${trip.status}:${targetLatitude}:${targetLongitude}`;
+  const movedKm = state.driverRoutePosition
+    ? Math.hypot(
+      (from.latitude - state.driverRoutePosition.latitude) * 111,
+      (from.longitude - state.driverRoutePosition.longitude) * 111 * Math.cos(from.latitude * Math.PI / 180)
+    )
+    : Infinity;
+  if (state.driverRouteKey === key && Date.now() - state.driverRouteUpdatedAt < 30000 && movedKm < 0.1) return;
+
+  const requestId = ++state.driverRouteRequestId;
+  state.driverRouteController?.abort();
+  state.driverRouteController = new AbortController();
+  try {
+    const coordinates = `${from.longitude},${from.latitude};${targetLongitude},${targetLatitude}`;
+    const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=false`, {
+      signal: state.driverRouteController.signal
+    });
+    if (!response.ok) throw new Error(`El servicio de rutas respondió HTTP ${response.status}.`);
+    const result = await response.json();
+    const route = result.code === "Ok" ? result.routes?.[0]?.geometry?.coordinates : null;
+    if (!Array.isArray(route) || route.length < 2) throw new Error("No se encontró la ruta del viaje.");
+    if (requestId !== state.driverRouteRequestId) return;
+    state.driverRouteLayer?.remove();
+    state.driverRouteLayer = window.L.polyline(route.map(([longitude, latitude]) => [latitude, longitude]), {
+      color: "#18795b", weight: 5, opacity: 0.9
+    }).addTo(state.driverMap);
+    if (!state.driverMapDidFit) {
+      state.driverMap.fitBounds(state.driverRouteLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
+      state.driverMapDidFit = true;
+    }
+    state.driverRouteKey = key;
+    state.driverRoutePosition = { latitude: from.latitude, longitude: from.longitude };
+    state.driverRouteUpdatedAt = Date.now();
+    state.driverRouteError = "";
+  } catch (error) {
+    if (error.name !== "AbortError" && requestId === state.driverRouteRequestId) {
+      state.driverRouteError = `No se pudo calcular la ruta: ${error.message}`;
+      console.error("No se pudo actualizar la ruta del viaje:", error);
+      const message = document.querySelector("#driver-map-message");
+      if (message) message.textContent = state.driverRouteError;
+    }
+  }
+}
+
+function refreshCourierScreenOrders() {
+  const containerId = state.screen === "activos" ? "#driver-order-list" : "#driver-current-order-list";
+  const container = document.querySelector(containerId);
+  if (!container) return;
+  const orders = state.screen === "activos"
+    ? state.orders.filter((order) => order.service_type === "traslado"
+      && order.status === "pending" && order.released !== false
+      && (order.vehicle_category || "moto") === (state.profile.vehicle_category || "moto"))
+      .sort((left, right) => Number(right.transport_mode === "express") - Number(left.transport_mode === "express"))
+    : state.orders.filter((order) => order.service_type === "traslado"
+      && order.courier_id === state.profile.id && !["delivered", "cancelled"].includes(order.status));
+  container.innerHTML = renderOrderCards(state.screen === "activos" && !state.profile.online ? [] : orders, state.screen === "activos" ? "available" : "current");
+  bindOrderActions();
+}
+
+function openTripNavigation(orderId) {
+  const trip = state.orders.find((order) => order.id === orderId && order.courier_id === state.profile?.id);
+  if (!trip) return showToast("No se encontró un viaje asignado a tu cuenta.", true);
+  const pickup = trip.status === "assigned";
+  const latitude = Number(pickup ? trip.pickup_latitude : trip.destination_latitude);
+  const longitude = Number(pickup ? trip.pickup_longitude : trip.destination_longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return showToast("El viaje no tiene coordenadas válidas para navegar.", true);
+  if (state.driverNavigation === "google-maps") {
+    const url = new URL("https://www.google.com/maps/dir/");
+    url.searchParams.set("api", "1");
+    url.searchParams.set("destination", `${latitude},${longitude}`);
+    url.searchParams.set("travelmode", "driving");
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+    return;
+  }
+  state.screen = "curso";
+  renderApp();
+  state.driverMap?.setView([latitude, longitude], 15);
+  void refreshDriverMap();
+}
+
+function activeCustomerTrip() {
+  return state.orders.find((order) => order.customer_id === state.profile?.id
+    && order.service_type === "traslado"
+    && !["delivered", "cancelled"].includes(order.status)) || null;
+}
+
+function destroyCustomerTripMap() {
+  clearInterval(state.customerTripLocationTimer);
+  state.customerTripLocationTimer = null;
+  state.customerTripMap?.remove();
+  state.customerTripMap = null;
+  state.customerTripMapContainer = null;
+  state.customerTripMarkers = null;
+  state.customerTripRouteLayer = null;
+  state.customerTripLocation = null;
+  state.customerTripOrderId = null;
+  state.customerTripRouteRequestId += 1;
+}
+
+async function initializeCustomerTripMap() {
+  const container = document.querySelector("#customer-trip-map");
+  if (!container || state.profile?.role !== "cliente") return;
+  try {
+    const leaflet = await loadLeaflet();
+    if (!container.isConnected || !["servicio", "historial_cliente"].includes(state.screen)) return;
+    if (state.customerTripMap && state.customerTripMapContainer !== container) destroyCustomerTripMap();
+    if (!state.customerTripMap) {
+      state.customerTripMapContainer = container;
+      const trip = activeCustomerTrip();
+      const center = trip
+        ? [Number(trip.pickup_latitude), Number(trip.pickup_longitude)]
+        : [10.2447, -67.5958];
+      state.customerTripMap = leaflet.map(container).setView(center, 13);
+      leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
+      }).addTo(state.customerTripMap);
+      state.customerTripMarkers = leaflet.layerGroup().addTo(state.customerTripMap);
+      setTimeout(() => state.customerTripMap?.invalidateSize(), 0);
+    }
+    await refreshCustomerTripLocation();
+    clearInterval(state.customerTripLocationTimer);
+    state.customerTripLocationTimer = setInterval(() => void refreshCustomerTripLocation(), 10000);
+  } catch (error) {
+    console.error("No se pudo inicializar el seguimiento del viaje:", error);
+    const message = document.querySelector("#customer-trip-map-message");
+    if (message) message.textContent = `No se pudo cargar el mapa: ${error.message}`;
+  }
+}
+
+async function calculateCustomerTripRoute(trip) {
+  const requestId = ++state.customerTripRouteRequestId;
+  const pickupLatitude = Number(trip.pickup_latitude);
+  const pickupLongitude = Number(trip.pickup_longitude);
+  const destinationLatitude = Number(trip.destination_latitude);
+  const destinationLongitude = Number(trip.destination_longitude);
+  if (![pickupLatitude, pickupLongitude, destinationLatitude, destinationLongitude].every(Number.isFinite)) {
+    throw new Error("Este viaje no tiene coordenadas válidas.");
+  }
+  const coordinates = `${pickupLongitude},${pickupLatitude};${destinationLongitude},${destinationLatitude}`;
+  const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=false`);
+  if (!response.ok) throw new Error(`El servicio de rutas respondió HTTP ${response.status}.`);
+  const result = await response.json();
+  const route = result.code === "Ok" ? result.routes?.[0]?.geometry?.coordinates : null;
+  if (!Array.isArray(route) || route.length < 2) throw new Error("No se encontró la ruta del viaje.");
+  if (requestId !== state.customerTripRouteRequestId) return;
+  state.customerTripRouteLayer?.remove();
+  state.customerTripRouteLayer = window.L.polyline(route.map(([longitude, latitude]) => [latitude, longitude]), {
+    color: "#18795b", weight: 5, opacity: 0.9
+  }).addTo(state.customerTripMap);
+  state.customerTripMap.fitBounds(state.customerTripRouteLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
+}
+
+function renderCustomerTripMarkers(trip) {
+  if (!state.customerTripMap || !state.customerTripMarkers) return;
+  const leaflet = window.L;
+  state.customerTripMarkers.clearLayers();
+  for (const [label, latitude, longitude, color] of [
+    ["Recogida", trip.pickup_latitude, trip.pickup_longitude, "#18795b"],
+    ["Destino", trip.destination_latitude, trip.destination_longitude, "#e4963b"]
+  ]) {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    leaflet.circleMarker([lat, lng], {
+      radius: 8, color: "#fff", weight: 2, fillColor: color, fillOpacity: 1
+    }).bindPopup(label).addTo(state.customerTripMarkers);
+  }
+  const location = state.customerTripLocation;
+  const latitude = Number(location?.latitude);
+  const longitude = Number(location?.longitude);
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    leaflet.circleMarker([latitude, longitude], {
+      radius: 10, color: "#fff", weight: 3, fillColor: "#4b8ff5", fillOpacity: 1
+    }).bindPopup("Ubicación actual del conductor").addTo(state.customerTripMarkers);
+  }
+}
+
+async function refreshCustomerTripLocation() {
+  if (!state.customerTripMap || state.profile?.role !== "cliente") return;
+  const trip = activeCustomerTrip();
+  const message = document.querySelector("#customer-trip-map-message");
+  const status = document.querySelector("#customer-trip-status");
+  if (!trip) return;
+  if (status) status.textContent = RIDE_STATUS_NAMES[trip.status] || trip.status;
+  if (state.customerTripOrderId !== trip.id) {
+    state.customerTripOrderId = trip.id;
+    state.customerTripLocation = null;
+    state.customerTripRouteLayer?.remove();
+    state.customerTripRouteLayer = null;
+    void calculateCustomerTripRoute(trip).catch((error) => {
+      const node = document.querySelector("#customer-trip-map-message");
+      if (node) node.textContent = `No se pudo calcular la ruta: ${error.message}`;
+    });
+  }
+  const { data, error } = await supabase.rpc("get_customer_courier_location", { p_order_id: trip.id });
+  if (error) {
+    if (message) message.textContent = `No se pudo actualizar la ubicación del conductor: ${error.message}`;
+    console.error("No se pudo consultar la ubicación del conductor asignado:", error);
+    return;
+  }
+  state.customerTripLocation = Array.isArray(data) ? data[0] || null : data || null;
+  renderCustomerTripMarkers(trip);
+  if (message) {
+    message.textContent = state.customerTripLocation?.updated_at
+      ? `Ubicación actualizada ${dateTime(state.customerTripLocation.updated_at)}.`
+      : trip.courier_id
+        ? "Esperando una ubicación GPS reciente del conductor."
+        : "Esperando que soporte libere el viaje para los conductores conectados.";
+  }
+}
+
+function refreshCustomerHistoryScreen() {
+  const activeTrip = activeCustomerTrip();
+  const mapContainer = document.querySelector("#customer-trip-map");
+  if (Boolean(activeTrip) !== Boolean(mapContainer)) {
+    destroyCustomerTripMap();
+    renderApp();
+    return;
+  }
+  const list = document.querySelector("#customer-history-list");
+  if (list) {
+    const orders = state.orders.filter((order) => order.customer_id === state.profile.id && order.service_type === "traslado");
+    list.innerHTML = renderOrderCards(orders, "customer");
+    bindOrderActions();
+  }
+  if (activeTrip) {
+    const status = document.querySelector("#customer-trip-status");
+    if (status) status.textContent = RIDE_STATUS_NAMES[activeTrip.status] || activeTrip.status;
+    void refreshCustomerTripLocation();
+  }
+}
+
+async function createTripShareLink(orderId) {
+  const trip = state.orders.find((order) => order.id === orderId && order.customer_id === state.profile?.id);
+  if (!trip || !["assigned", "at_store", "in_transit"].includes(trip.status)) {
+    return showToast("Solo puedes compartir un viaje que ya tenga conductor asignado.", true);
+  }
+  const { data, error } = await supabase.rpc("create_trip_share_link", { p_order_id: orderId });
+  if (error) return reportError(error);
+  const share = Array.isArray(data) ? data[0] : data;
+  if (!share?.token || !share?.expires_at) return reportError(new Error("Supabase no devolvió el enlace de seguimiento."));
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = new URLSearchParams({ share: share.token }).toString();
+  state.tripShareLinks[orderId] = { url: url.toString(), expiresAt: share.expires_at };
+  state.tripShareOrderId = orderId;
+  showToast("Enlace seguro creado. Compártelo solo con tu familiar de confianza.");
+  refreshCustomerHistoryScreen();
+}
+
+async function revokeTripShareLink(orderId) {
+  const { data, error } = await supabase.rpc("revoke_trip_share_link", { p_order_id: orderId });
+  if (error) return reportError(error);
+  if (!data) return showToast("No había un enlace activo para revocar.", true);
+  delete state.tripShareLinks[orderId];
+  showToast("El enlace de seguimiento fue revocado.");
+  refreshCustomerHistoryScreen();
+}
+
+async function bootPublicTripShare(token) {
+  app.innerHTML = `<div class="auth-page"><section class="auth-shell"><div class="auth-card"><img class="brand-logo" src="./enruta2-logo.png" alt="EnRuta2"><p class="eyebrow">SEGUIMIENTO COMPARTIDO</p><h1>Comprobando enlace…</h1><p class="muted" role="status">Verificando que el viaje siga activo.</p></div></section>${legalFooter()}</div>`;
+  if (!/^[0-9a-f]{64}$/i.test(token)) {
+    renderInvalidPublicTripShare();
+    return;
+  }
+  const { data, error } = await supabase.rpc("get_trip_share", { p_token: token });
+  if (error) {
+    renderInvalidPublicTripShare(`No se pudo consultar el viaje: ${error.message}`);
+    return;
+  }
+  const share = Array.isArray(data) ? data[0] : data;
+  if (!share) {
+    renderInvalidPublicTripShare();
+    return;
+  }
+  app.innerHTML = `<div class="auth-page"><section class="auth-shell share-shell"><div class="share-card"><img class="brand-logo" src="./enruta2-logo.png" alt="EnRuta2"><p class="eyebrow">SEGUIMIENTO COMPARTIDO</p><h1>Viaje de un familiar</h1><p id="public-trip-status" class="muted">${escapeHtml(RIDE_STATUS_NAMES[share.status] || share.status)}</p><div id="public-trip-map" class="service-map" role="application" aria-label="Ruta y ubicación actual del conductor"></div><p id="public-trip-message" class="fine-print" role="status">Cargando ubicación del conductor…</p><p class="fine-print">Este enlace es privado. Muestra solo el trayecto y caduca al finalizar el viaje o en 24 horas.</p></div></section>${legalFooter()}</div>`;
+  try {
+    const leaflet = await loadLeaflet();
+    const container = document.querySelector("#public-trip-map");
+    if (!container) throw new Error("No se encontró el contenedor del mapa.");
+    state.publicTripMap = leaflet.map(container).setView([Number(share.pickup_latitude), Number(share.pickup_longitude)], 13);
+    leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
+    }).addTo(state.publicTripMap);
+    state.publicTripMarkers = leaflet.layerGroup().addTo(state.publicTripMap);
+    state.publicTripOrderId = share.order_id;
+    await updatePublicTripShare(token, share);
+    state.publicTripRefreshTimer = setInterval(() => void updatePublicTripShare(token), 10000);
+    setTimeout(() => state.publicTripMap?.invalidateSize(), 0);
+  } catch (mapError) {
+    const message = document.querySelector("#public-trip-message");
+    if (message) message.textContent = `No se pudo cargar el mapa: ${mapError.message}`;
+  }
+}
+
+function renderInvalidPublicTripShare(message = "Este enlace no es válido, fue revocado o el viaje ya finalizó.") {
+  clearInterval(state.publicTripRefreshTimer);
+  state.publicTripRefreshTimer = null;
+  state.publicTripMap?.remove();
+  state.publicTripMap = null;
+  state.publicTripMarkers = null;
+  state.publicTripRouteLayer = null;
+  state.publicTripOrderId = null;
+  app.innerHTML = `<div class="auth-page"><section class="auth-shell"><div class="auth-card"><img class="brand-logo" src="./enruta2-logo.png" alt="EnRuta2"><p class="eyebrow">SEGUIMIENTO COMPARTIDO</p><h1>Enlace no disponible</h1><p class="muted">${escapeHtml(message)}</p></div></section>${legalFooter()}</div>`;
+}
+
+async function updatePublicTripShare(token, initialData = null) {
+  if (state.publicTripRefreshInProgress) return;
+  state.publicTripRefreshInProgress = true;
+  try {
+    const share = initialData || await supabase.rpc("get_trip_share", { p_token: token }).then(({ data, error }) => {
+      if (error) throw error;
+      return Array.isArray(data) ? data[0] || null : data || null;
+    });
+    if (!share) {
+      renderInvalidPublicTripShare();
+      return;
+    }
+    const status = document.querySelector("#public-trip-status");
+    if (status) status.textContent = RIDE_STATUS_NAMES[share.status] || share.status;
+    const markers = state.publicTripMarkers;
+    if (!markers || !state.publicTripMap) return;
+    markers.clearLayers();
+    for (const [label, latitude, longitude, color] of [
+      ["Recogida", share.pickup_latitude, share.pickup_longitude, "#18795b"],
+      ["Destino", share.destination_latitude, share.destination_longitude, "#e4963b"],
+      ["Conductor", share.latitude, share.longitude, "#4b8ff5"]
+    ]) {
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      window.L.circleMarker([lat, lng], {
+        radius: label === "Conductor" ? 10 : 8, color: "#fff", weight: 2, fillColor: color, fillOpacity: 1
+      }).bindPopup(label === "Conductor" ? "Ubicación actual del conductor" : label).addTo(markers);
+    }
+    if (state.publicTripOrderId !== share.order_id) {
+      state.publicTripOrderId = share.order_id;
+      state.publicTripRouteLayer?.remove();
+      state.publicTripRouteLayer = null;
+    }
+    if (!state.publicTripRouteLayer) {
+      const coordinates = `${Number(share.pickup_longitude)},${Number(share.pickup_latitude)};${Number(share.destination_longitude)},${Number(share.destination_latitude)}`;
+      const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=false`);
+      if (!response.ok) throw new Error(`El servicio de rutas respondió HTTP ${response.status}.`);
+      const result = await response.json();
+      const route = result.code === "Ok" ? result.routes?.[0]?.geometry?.coordinates : null;
+      if (!Array.isArray(route) || route.length < 2) throw new Error("No se encontró la ruta del viaje.");
+      state.publicTripRouteLayer = window.L.polyline(route.map(([longitude, latitude]) => [latitude, longitude]), {
+        color: "#18795b", weight: 5, opacity: 0.9
+      }).addTo(state.publicTripMap);
+      state.publicTripMap.fitBounds(state.publicTripRouteLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
+    }
+    const message = document.querySelector("#public-trip-message");
+    if (message) message.textContent = share.updated_at
+      ? `Ubicación actualizada ${dateTime(share.updated_at)}.`
+      : "Esperando una ubicación GPS reciente del conductor.";
+  } catch (error) {
+    const message = document.querySelector("#public-trip-message");
+    if (message) message.textContent = `No se pudo actualizar el seguimiento: ${error.message}`;
+    console.error("No se pudo actualizar el enlace público del viaje:", error);
+  } finally {
+    state.publicTripRefreshInProgress = false;
+  }
+}
+
+function destroyMonitoringMap() {
+  if (state.heatmapRefreshTimer) clearInterval(state.heatmapRefreshTimer);
+  state.heatmapRefreshTimer = null;
+  if (state.monitoringMap) state.monitoringMap.remove();
+  state.monitoringMap = null;
+  state.monitoringMarkers = null;
+  state.monitoringDemandHeatLayer = null;
+  state.monitoringCourierHeatLayer = null;
+  state.monitoringMapContainer = null;
+  state.monitoringMapDidFit = false;
+}
+
 async function initializeMonitoringMap() {
   const container = document.querySelector("#monitoring-map");
   if (!container) return;
   try {
     const leaflet = await loadLeaflet();
-    if (state.screen !== "monitoreo" || !container.isConnected) return;
-    if (state.monitoringMap && state.monitoringMapContainer !== container) {
-      state.monitoringMap.remove();
-      state.monitoringMap = null;
-      state.monitoringMarkers = null;
-      state.monitoringMapDidFit = false;
+    let heatAvailable = true;
+    try {
+      await loadLeafletHeat();
+      state.heatmapPluginError = "";
+    } catch (error) {
+      heatAvailable = false;
+      state.heatmapPluginError = error.message;
+      console.error("No se pudieron cargar las zonas de calor:", error);
     }
+    if (state.screen !== "monitoreo" || !container.isConnected) return;
+    if (state.monitoringMap && state.monitoringMapContainer !== container) destroyMonitoringMap();
     if (!state.monitoringMap) {
       state.monitoringMapContainer = container;
       state.monitoringMap = leaflet.map(container).setView([10.5, -66.9], 5);
@@ -1048,6 +1633,20 @@ async function initializeMonitoringMap() {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
       }).addTo(state.monitoringMap);
+      if (heatAvailable) {
+        state.monitoringDemandHeatLayer = leaflet.heatLayer([], {
+          radius: 32, blur: 24, minOpacity: 0.2, maxZoom: 16,
+          gradient: { 0.2: "#42d392", 0.5: "#ffe066", 0.8: "#ff9f43", 1: "#ff4059" }
+        }).addTo(state.monitoringMap);
+        state.monitoringCourierHeatLayer = leaflet.heatLayer([], {
+          radius: 30, blur: 22, minOpacity: 0.2, maxZoom: 16,
+          gradient: { 0.2: "#5bd6d0", 0.55: "#4b8ff5", 1: "#8d54ef" }
+        }).addTo(state.monitoringMap);
+        void refreshDemandHeatPoints();
+        state.heatmapRefreshTimer = setInterval(refreshDemandHeatPoints, 30 * 60 * 1000);
+      } else {
+        document.querySelectorAll("[data-heat-toggle]").forEach((button) => { button.disabled = true; });
+      }
       state.monitoringMarkers = leaflet.layerGroup().addTo(state.monitoringMap);
     }
     refreshMonitoringMap();
@@ -1055,7 +1654,60 @@ async function initializeMonitoringMap() {
     console.error("No se pudo inicializar el mapa de monitoreo:", error);
     const message = document.querySelector("#monitoring-map-message");
     if (message) message.textContent = error.message;
+    const heatMessage = document.querySelector("#monitoring-heatmap-message");
+    if (heatMessage) heatMessage.textContent = error.message;
   }
+}
+
+async function refreshDemandHeatPoints() {
+  if (!state.profile || !["motorizado", "soporte", "administracion"].includes(state.profile.role)) return;
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const points = [];
+  const pageSize = 1000;
+  try {
+    if (state.profile.role === "motorizado") {
+      const { data, error } = await supabase.rpc("get_driver_heatmap");
+      if (error) throw error;
+      for (const point of data || []) {
+        const latitude = Number(point.latitude);
+        const longitude = Number(point.longitude);
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)
+          && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+          points.push([latitude, longitude, Math.max(0.2, Math.min(1, Number(point.intensity) || 0.5))]);
+        }
+      }
+    } else {
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase.from("orders")
+          .select("pickup_latitude,pickup_longitude,created_at")
+          .eq("service_type", "traslado")
+          .gte("created_at", cutoff)
+          .neq("status", "cancelled")
+          .not("pickup_latitude", "is", null)
+          .not("pickup_longitude", "is", null)
+          .order("created_at", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        for (const order of data || []) {
+          const latitude = Number(order.pickup_latitude);
+          const longitude = Number(order.pickup_longitude);
+          if (Number.isFinite(latitude) && Number.isFinite(longitude)
+            && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+            points.push([latitude, longitude, 0.65]);
+          }
+        }
+        if (!data || data.length < pageSize) break;
+      }
+    }
+    state.demandHeatPoints = points;
+    state.demandHeatUpdatedAt = new Date();
+    state.demandHeatError = "";
+  } catch (error) {
+    console.error("No se pudo actualizar la zona de demanda:", error);
+    state.demandHeatError = error.message || "Error consultando pedidos para la zona de demanda.";
+  }
+  refreshMonitoringMap();
+  refreshDriverMap();
 }
 
 function monitoringLocations() {
@@ -1070,6 +1722,10 @@ function refreshMonitoringMap() {
   if (!state.monitoringMap || !state.monitoringMarkers) return;
   const leaflet = window.L;
   const locations = monitoringLocations();
+  state.monitoringDemandHeatLayer?.setLatLngs(state.heatLayerVisibility.demand ? state.demandHeatPoints : []);
+  state.monitoringCourierHeatLayer?.setLatLngs(state.heatLayerVisibility.couriers
+    ? locations.map((location) => [location.latitude, location.longitude, 0.8])
+    : []);
   state.monitoringMarkers.clearLayers();
   const bounds = [];
 
@@ -1105,6 +1761,15 @@ function refreshMonitoringMap() {
       ? `${locations.length} ubicación${locations.length === 1 ? "" : "es"} reciente${locations.length === 1 ? "" : "s"} en el mapa.`
       : "No hay posiciones GPS recientes. Verifica que los motorizados estén en línea y hayan permitido la ubicación.";
   }
+  const heatMessage = document.querySelector("#monitoring-heatmap-message");
+  if (heatMessage) {
+    const updated = state.demandHeatUpdatedAt ? dateTime(state.demandHeatUpdatedAt) : "pendiente";
+    heatMessage.textContent = state.heatmapPluginError
+      ? state.heatmapPluginError
+      : state.demandHeatError
+      ? `No se pudo actualizar la demanda: ${state.demandHeatError}`
+      : `${state.demandHeatPoints.length} recogidas con ubicación en 24 h · ${locations.length} motorizados con GPS reciente · demanda actualizada: ${updated}.`;
+  }
 }
 
 function refreshMonitoringView() {
@@ -1124,11 +1789,11 @@ function renderDashboard() {
   const revenue = formatMoneyTotals(completed, (order) => role === "motorizado" ? courierEarnings(order) : Number(order.delivery_fee));
   const activeOrders = state.orders.filter((order) => !["delivered", "cancelled"].includes(order.status));
   return `<div class="grid metrics">
-    <article class="card"><span class="metric-label">Pedidos creados hoy</span><div class="metric-value">${createdToday.length}</div><span class="metric-foot">${completed.length} entregas finalizadas</span></article>
-    <article class="card"><span class="metric-label">${role === "motorizado" ? `Tu ganancia hoy (${courierEarningsPercentage()}%)` : "Delivery generado hoy"}</span><div class="metric-value metric-text">${revenue}</div><span class="metric-foot">${role === "motorizado" ? "Tu parte de los pedidos entregados" : "Suma de costos de delivery"}</span></article>
-    <article class="card"><span class="metric-label">Motorizados activos</span><div class="metric-value">${role === "motorizado" ? (state.profile.online ? "1" : "0") : countOnline()}</div><span class="metric-foot">Disponibles en este momento</span></article>
+    <article class="card"><span class="metric-label">Viajes solicitados hoy</span><div class="metric-value">${createdToday.length}</div><span class="metric-foot">${completed.length} viajes finalizados</span></article>
+    <article class="card"><span class="metric-label">${role === "motorizado" ? `Tu ganancia hoy (${courierEarningsPercentage()}%)` : "Ingresos por viajes hoy"}</span><div class="metric-value metric-text">${revenue}</div><span class="metric-foot">${role === "motorizado" ? "Tu parte de las tarifas finalizadas" : "Total de tarifas finalizadas"}</span></article>
+    <article class="card"><span class="metric-label">Conductores activos</span><div class="metric-value">${role === "motorizado" ? (state.profile.online ? "1" : "0") : countOnline()}</div><span class="metric-foot">Disponibles en este momento</span></article>
   </div>
-  <div class="section-head"><h2>${role === "motorizado" ? "Tus entregas activas" : "Pedidos en curso"}</h2></div>
+  <div class="section-head"><h2>${role === "motorizado" ? "Tus viajes activos" : "Viajes en curso"}</h2></div>
   <div class="list">${renderOrderCards(activeOrders.filter((order) => role !== "motorizado" || order.courier_id === state.profile.id).slice(0, 5), "dashboard")}</div>`;
 }
 
@@ -1138,10 +1803,10 @@ function statusBadge(status) {
   return `<span class="badge ${color}">${label}</span>`;
 }
 
-function whatsappUrl(phone, allyName) {
+function whatsappUrl(phone) {
   let digits = String(phone || "").replace(/\D/g, "");
   if (digits.length === 10) digits = `57${digits}`;
-  const message = `Buenas, soy el delivery de ${allyName}, ya estoy recogiendo su pedido, me confirma su ubicación por favor.`;
+  const message = "Hola, soy tu conductor de EnRuta2. Estoy en el punto de recogida.";
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
@@ -1156,142 +1821,75 @@ function courierEarningsPercentage() {
   return Number.isFinite(configuredPercentage) ? Math.min(100, Math.max(0, configuredPercentage)) : 70;
 }
 
-function orderDeadline(order) {
-  if (order.status === "pending") return new Date(order.assigned_at || order.created_at).getTime() + 10 * 60 * 1000;
-  if (order.status === "assigned" && !order.at_store_at) return new Date(order.assigned_at || order.created_at).getTime() + 10 * 60 * 1000;
-  return null;
-}
-
-function renderDeadline(order) {
-  if (!["soporte", "administracion"].includes(state.profile.role)) return "";
-  const deadline = orderDeadline(order);
-  if (!deadline) return "";
-  const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-  const overdue = seconds === 0;
-  const display = overdue ? `RETRASADO +${formatElapsed(-seconds)}` : `Llegada al comercio en ${formatElapsed(seconds)}`;
-  return `<div class="deadline ${overdue ? "overdue" : ""}" data-deadline="${deadline}" data-order-id="${order.id}">${display}</div>`;
-}
-
-function formatElapsed(seconds) {
-  const safeSeconds = Math.abs(seconds);
-  const minutes = String(Math.floor(safeSeconds / 60)).padStart(2, "0");
-  const remainingSeconds = String(safeSeconds % 60).padStart(2, "0");
-  return `${minutes}:${remainingSeconds}`;
-}
-
-function updateOverdueClocks() {
-  const now = Date.now();
-  document.querySelectorAll(".deadline[data-deadline]").forEach((node) => {
-    const deadline = Number(node.dataset.deadline);
-    const seconds = Math.ceil((deadline - now) / 1000);
-    const overdue = seconds <= 0;
-    node.classList.toggle("overdue", overdue);
-    node.closest(".order-card")?.classList.toggle("late", overdue);
-    node.textContent = overdue
-      ? `RETRASADO +${formatElapsed(-seconds)}`
-      : `Llegada al comercio en ${formatElapsed(seconds)}`;
-  });
-
-  if (!state.overdueSoundsEnabled || document.hidden) return;
-  let shouldAlarm = false;
-  for (const order of state.orders) {
-    const deadline = orderDeadline(order);
-    if (!deadline || now < deadline) continue;
-    const lastAlarm = state.overdueAlarmTimes.get(order.id) || 0;
-    if (now - lastAlarm < 2 * 60 * 1000) continue;
-    state.overdueAlarmTimes.set(order.id, now);
-    shouldAlarm = true;
-  }
-  if (shouldAlarm) void playOverdueAlarm();
-}
-
-async function enableOverdueSounds() {
-  if (state.overdueSoundsEnabled) {
-    state.overdueSoundsEnabled = false;
-    showToast("Alarma de pedidos retrasados desactivada.");
-    renderApp();
-    return;
-  }
-  try {
-    await prepareAlertAudio("overdue");
-    state.overdueSoundsEnabled = true;
-    showToast("Alarma activada con el audio de peligro clásico.");
-    renderApp();
-  } catch (error) {
-    reportError(error);
-  }
-}
-
-async function playOverdueAlarm() {
-  if (!state.overdueSoundsEnabled) return;
-  await playAlertAudio("overdue");
-}
-
 function renderOrderCards(orders, context = "") {
-  if (!orders.length) return `<div class="empty">No hay pedidos para mostrar.</div>`;
+  if (!orders.length) return `<div class="empty">No hay viajes para mostrar.</div>`;
   return orders.map((order) => {
-    const serviceNames = { traslado: "Traslado", encomienda: "Encomienda", compra: "Compra", delivery: "Delivery" };
-    const allyName = order.allies?.name || (serviceNames[order.service_type] ? `Servicio · ${serviceNames[order.service_type]}` : "Aliado");
-    const ally = escapeHtml(allyName);
     const courier = escapeHtml(order.courier?.full_name || "Sin asignar");
     const buttons = [];
     if (context === "available") {
       buttons.push(`<span class="badge green courier-earnings">Tu ganancia: ${formatMoney(courierEarnings(order), order.currency)}</span>`);
-      buttons.push(`<button class="button primary small" data-action="claim" data-id="${order.id}">Tomar pedido</button>`);
+      buttons.push(`<button class="button primary small" data-action="claim" data-id="${order.id}">Aceptar viaje</button>`);
     }
     if (context === "current") {
-      const next = { assigned: ["at_store", "Llegada al comercio"], at_store: ["in_transit", "Pedido en camino"], in_transit: ["delivered", "Pedido entregado"] }[order.status];
+      const next = { assigned: ["at_store", "Llegué al punto de recogida"], at_store: ["in_transit", "Iniciar viaje"], in_transit: ["delivered", "Finalizar viaje"] }[order.status];
       if (next) buttons.push(`<button class="button ${next[0] === "delivered" ? "success" : "primary"} small" data-action="advance" data-status="${next[0]}" data-id="${order.id}">${next[1]}</button>`);
-      buttons.push(`<button class="button subtle small" data-action="maps" data-url="${escapeHtml(order.maps_url || "")}">Abrir ubicación</button>`);
+      buttons.push(`<button class="button subtle small" data-action="navigate-trip" data-id="${order.id}">Navegar</button>`);
       buttons.push(`<button class="button subtle small" data-action="copy-phone" data-phone="${escapeHtml(order.client_phone)}">Copiar teléfono</button>`);
-      buttons.push(`<a class="button success small" target="_blank" rel="noopener noreferrer" href="${whatsappUrl(order.client_phone, allyName)}">Contactar cliente</a>`);
+      buttons.push(`<a class="button success small" target="_blank" rel="noopener noreferrer" href="${whatsappUrl(order.client_phone)}">Contactar pasajero</a>`);
     }
     if (context === "pending" && !order.released && (!order.service_type || order.service_type === "traslado")) {
-      buttons.push(`<button class="button primary small" data-action="release" data-id="${order.id}">${order.service_type ? "Aprobar y liberar servicio" : "Liberar pedido"}</button>`);
-    }
-    if (["staff", "pending"].includes(context) && order.service_type && order.status === "pending" && !order.released && ["administracion", "soporte"].includes(state.profile.role)) {
-      buttons.push(`<label class="assign-control">Asignar al cotizar<select data-quote-courier="${order.id}"><option value="">Dejar disponible</option>${activeCouriers().map((profile) => `<option value="${profile.id}">${escapeHtml(profile.full_name)}</option>`).join("")}</select></label>`);
-      buttons.push(`<button class="button primary small" data-action="quote-service" data-id="${order.id}">Cotizar y liberar</button>`);
+      buttons.push(`<button class="button primary small" data-action="release" data-id="${order.id}">Liberar a conductores</button>`);
     }
     if (["staff", "pending"].includes(context) && state.profile.role === "soporte" && !["delivered", "cancelled"].includes(order.status)) {
-      buttons.push(`<button class="button danger small" data-action="cancel-order" data-id="${order.id}">Cancelar pedido</button>`);
+      buttons.push(`<button class="button danger small" data-action="cancel-order" data-id="${order.id}">Cancelar viaje</button>`);
     }
     if (context === "staff" && order.status === "assigned" && !order.at_store_at && ["administracion", "soporte"].includes(state.profile.role)) {
-      buttons.push(`<label class="assign-control">Nuevo motorizado<select data-reassign-select="${order.id}"><option value="">Selecciona un motorizado activo…</option>${couriersForOrder(order).filter((profile) => profile.id !== order.courier_id).map((profile) => `<option value="${profile.id}">${escapeHtml(profile.full_name)}</option>`).join("")}</select></label>`);
-      buttons.push(`<button class="button primary small" data-action="reassign" data-id="${order.id}">Reasignar pedido</button>`);
-      buttons.push(`<button class="button subtle small" data-action="release" data-id="${order.id}">Liberar para que otro lo tome</button>`);
+      buttons.push(`<label class="assign-control">Nuevo conductor<select data-reassign-select="${order.id}"><option value="">Selecciona un conductor activo…</option>${couriersForOrder(order).filter((profile) => profile.id !== order.courier_id).map((profile) => `<option value="${profile.id}">${escapeHtml(profile.full_name)}</option>`).join("")}</select></label>`);
+      buttons.push(`<button class="button primary small" data-action="reassign" data-id="${order.id}">Reasignar viaje</button>`);
+      buttons.push(`<button class="button subtle small" data-action="release" data-id="${order.id}">Liberar para otro conductor</button>`);
     } else if (["staff", "pending"].includes(context) && ["administracion", "soporte"].includes(state.profile.role) && order.status === "pending") {
-      buttons.push(`<label class="assign-control">Asignar motorizado<select data-action="assign" data-id="${order.id}"><option value="">${order.courier_id ? "Cambiar asignación…" : "Seleccionar…"}</option>${couriersForOrder(order).map((profile) => `<option value="${profile.id}" ${profile.id === order.courier_id ? "selected" : ""}>${escapeHtml(profile.full_name)}</option>`).join("")}</select></label>`);
+      buttons.push(`<label class="assign-control">Asignar conductor<select data-action="assign" data-id="${order.id}"><option value="">${order.courier_id ? "Cambiar asignación…" : "Seleccionar…"}</option>${couriersForOrder(order).map((profile) => `<option value="${profile.id}" ${profile.id === order.courier_id ? "selected" : ""}>${escapeHtml(profile.full_name)}</option>`).join("")}</select></label>`);
     }
     const isCourier = state.profile.role === "motorizado";
-    const priceLabel = order.service_type && !order.released && order.service_type !== "traslado"
-      ? `<strong>Cotización:</strong> Pendiente de soporte`
-      : order.service_type === "traslado" && !order.released
-        ? `<strong>Tarifa estimada:</strong> ${formatMoney(order.delivery_fee, order.currency)} · pendiente de revisión`
-      : isCourier
+    const priceLabel = isCourier
         ? `<strong>Tu ganancia (${courierEarningsPercentage()}%):</strong> ${formatMoney(courierEarnings(order), order.currency)}`
-        : `<strong>Delivery:</strong> ${formatMoney(order.delivery_fee, order.currency)}`;
+        : `<strong>Tarifa:</strong> ${formatMoney(order.delivery_fee, order.currency)}`;
     const orderStatus = order.status === "pending" && order.released === false && ["soporte", "administracion"].includes(state.profile.role)
-      ? `<span class="badge orange">${order.service_type && order.service_type !== "traslado" ? "Pendiente de cotización" : "Pendiente de soporte"}</span>`
-      : statusBadge(order.status);
-    return `<article class="order-card"><div class="order-top"><div><h3>${ally} <span class="muted">· ${escapeHtml(order.client_name)}</span></h3><p>Pedido #${order.id.slice(0, 8)} · ${dateTime(order.created_at)}</p></div>${orderStatus}</div>
-      ${renderDeadline(order)}
-      ${context === "current" && order.allies?.location_url ? `<div class="merchant-location"><button class="button subtle small" data-action="maps" data-url="${escapeHtml(order.allies.location_url)}">Ubicación del comercio</button></div>` : ""}
-      <p class="order-detail"><strong>Cliente:</strong> ${escapeHtml(order.client_name)} · ${escapeHtml(order.client_phone)}<br><strong>Descripción:</strong> ${escapeHtml(order.description || "—")}<br>${order.service_type ? `<strong>Tipo:</strong> ${escapeHtml(serviceNames[order.service_type] || order.service_type)}${order.transport_mode ? ` · ${order.transport_mode === "express" ? "Express" : "Económico"}` : ""}<br><strong>Recogida:</strong> ${escapeHtml(order.pickup_address || "—")}<br><strong>Destino:</strong> ${escapeHtml(order.destination_address || order.address || "—")}${order.route_distance_meters ? `<br><strong>Distancia estimada:</strong> ${(order.route_distance_meters / 1000).toFixed(2)} km` : ""}` : `<strong>Dirección:</strong> ${escapeHtml(order.address || "—")}`}<br><strong>Motorizado:</strong> ${courier === "Sin asignar" ? escapeHtml(order.courier_name || courier) : courier}<br><strong>Creado por:</strong> ${escapeHtml(order.creator?.full_name || order.creator_name || "—")}${context === "completed" ? `<br><strong>Recogida en comercio:</strong> ${dateTime(order.at_store_at)}<br><strong>Entrega:</strong> ${dateTime(order.delivered_at)}` : ""}${order.status === "cancelled" ? `<br><strong>Motivo de cancelación:</strong> ${escapeHtml(order.cancellation_reason || "No indicado")}<br><strong>Cancelado:</strong> ${dateTime(order.cancelled_at)}` : ""}<br>${priceLabel}</p>
+      ? `<span class="badge orange">Pendiente de liberación</span>`
+      : order.service_type === "traslado"
+        ? `<span class="badge ${order.status === "delivered" ? "green" : order.status === "pending" ? "gray" : order.status === "in_transit" ? "orange" : ""}">${RIDE_STATUS_NAMES[order.status] || order.status}</span>`
+        : statusBadge(statusNames[order.status] || order.status);
+    const shareLink = context === "customer" && ["assigned", "at_store", "in_transit"].includes(order.status)
+      ? renderTripSharePanel(order)
+      : "";
+    return `<article class="order-card"><div class="order-top"><div><h3>Viaje #${order.id.slice(0, 8)} <span class="muted">· ${escapeHtml(order.client_name)}</span></h3><p>${dateTime(order.created_at)}</p></div>${orderStatus}</div>
+      <p class="order-detail"><strong>Pasajero:</strong> ${escapeHtml(order.client_name)} · ${escapeHtml(order.client_phone)}<br><strong>Detalles:</strong> ${escapeHtml(order.description || "Traslado de pasajeros")}<br>${order.service_type ? `<strong>Vehículo:</strong> ${order.vehicle_category === "carro" ? "Carro" : "Moto"} · ${order.transport_mode === "express" ? "Express" : "Económico"}<br><strong>Recogida:</strong> ${escapeHtml(order.pickup_address || "—")}<br><strong>Destino:</strong> ${escapeHtml(order.destination_address || order.address || "—")}${order.route_distance_meters ? `<br><strong>Distancia estimada:</strong> ${(order.route_distance_meters / 1000).toFixed(2)} km` : ""}` : `<strong>Dirección:</strong> ${escapeHtml(order.address || "—")}`}<br><strong>Conductor:</strong> ${courier === "Sin asignar" ? escapeHtml(order.courier_name || courier) : courier}<br><strong>Creado por:</strong> ${escapeHtml(order.creator?.full_name || order.creator_name || "—")}${context === "completed" ? `<br><strong>Inicio:</strong> ${dateTime(order.at_store_at)}<br><strong>Finalizado:</strong> ${dateTime(order.delivered_at)}` : ""}${order.status === "cancelled" ? `<br><strong>Motivo de cancelación:</strong> ${escapeHtml(order.cancellation_reason || "No indicado")}<br><strong>Cancelado:</strong> ${dateTime(order.cancelled_at)}` : ""}<br>${priceLabel}</p>
       ${order.maps_url ? `<div class="order-actions"><button class="button subtle small" data-action="maps" data-url="${escapeHtml(order.maps_url)}">Abrir mapa</button></div>` : ""}
-      ${buttons.length ? `<div class="order-actions">${buttons.join("")}</div>` : ""}</article>`;
+      ${buttons.length ? `<div class="order-actions">${buttons.join("")}</div>` : ""}${shareLink}</article>`;
   }).join("");
 }
 
+function renderTripSharePanel(order) {
+  const share = state.tripShareLinks[order.id];
+  return `<section class="trip-share"><h4>Compartir viaje con tu familia</h4><p class="muted">El enlace muestra solo la ruta y la ubicación del conductor. Caduca al finalizar el viaje o en 24 horas y puedes revocarlo.</p>
+    ${share ? `<label>Enlace privado<input readonly value="${escapeHtml(share.url)}" aria-label="Enlace privado para compartir el viaje"></label><p class="fine-print">Vence ${dateTime(share.expiresAt)}</p>` : ""}
+    <div class="order-actions">${share ? `<button class="button subtle small" data-action="copy-trip-share" data-id="${order.id}">Copiar enlace</button>` : `<button class="button primary small" data-action="share-trip" data-id="${order.id}">Crear enlace seguro</button>`}<button class="button danger small" data-action="revoke-trip-share" data-id="${order.id}">Revocar enlace</button></div></section>`;
+}
+
 function renderCourierAvailable() {
-  const orders = state.orders.filter((order) => order.status === "pending" && order.released !== false)
+  const orders = state.orders.filter((order) => order.service_type === "traslado"
+    && order.status === "pending" && order.released !== false
+    && (order.vehicle_category || "moto") === (state.profile.vehicle_category || "moto"))
     .sort((left, right) => Number(right.transport_mode === "express") - Number(left.transport_mode === "express"));
-  return `<p class="muted">Toma un pedido disponible para asignarlo a tu cuenta. Solo podrás recibir pedidos mientras estés activo.</p><div class="list">${renderOrderCards(state.profile.online ? orders : [], "available")}</div>`;
+  return `<p class="muted">Zonas de demanda recientes y recogidas aproximadas de viajes disponibles para ${state.profile.vehicle_category === "carro" ? "carro" : "moto"}. Actívate para aceptar viajes.</p>
+    <div class="heat-layer-controls" role="group" aria-label="Capas del mapa del conductor"><span class="badge">${state.profile.vehicle_category === "carro" ? "Carro" : "Moto"}</span><label class="navigation-select">Navegación<select id="driver-navigation"><option value="enruta" ${state.driverNavigation === "enruta" ? "selected" : ""}>EnRuta2</option><option value="google-maps" ${state.driverNavigation === "google-maps" ? "selected" : ""}>Google Maps</option></select></label></div>
+    <div id="driver-map" class="monitoring-map" role="application" aria-label="Mapa de demanda y viajes"></div><p id="driver-map-message" class="fine-print" role="status">Cargando zonas de calor…</p>
+    <h2 class="section-title">Viajes disponibles · Ganancia estimada</h2><div id="driver-order-list" class="list">${renderOrderCards(state.profile.online ? orders : [], "available")}</div>`;
 }
 
 function renderCourierCurrent() {
-  const orders = state.orders.filter((order) => order.courier_id === state.profile.id && !["delivered", "cancelled"].includes(order.status));
-  return `<div class="list">${renderOrderCards(orders, "current")}</div>`;
+  const orders = state.orders.filter((order) => order.service_type === "traslado" && order.courier_id === state.profile.id && !["delivered", "cancelled"].includes(order.status));
+  return `<p class="muted">Tu ruta se actualiza con tu ubicación GPS. Puedes seguirla aquí o abrirla en Google Maps.</p><label class="navigation-select">Navegación preferida<select id="driver-navigation"><option value="enruta" ${state.driverNavigation === "enruta" ? "selected" : ""}>EnRuta2</option><option value="google-maps" ${state.driverNavigation === "google-maps" ? "selected" : ""}>Google Maps</option></select></label><div id="driver-map" class="monitoring-map" role="application" aria-label="Ruta del viaje activo"></div><p id="driver-map-message" class="fine-print" role="status">Cargando ruta…</p><div id="driver-current-order-list" class="list">${renderOrderCards(orders, "current")}</div>`;
 }
 
 function renderCourierDelivered() {
@@ -1316,7 +1914,7 @@ function filteredDelivered() {
 function deliveredSummary() {
   const orders = filteredDelivered();
   const amount = formatMoneyTotals(orders, courierEarnings);
-  return `<div class="grid metrics"><article class="card"><span class="metric-label">Pedidos en el periodo</span><div class="metric-value">${orders.length}</div></article><article class="card"><span class="metric-label">Ganancia (${courierEarningsPercentage()}%)</span><div class="metric-value metric-text">${amount}</div></article><article class="card"><span class="metric-label">Ganancia de hoy</span><div class="metric-value metric-text">${formatMoneyTotals(filteredToday(), courierEarnings)}</div></article></div><div class="section-head"><h2>Historial de entregas</h2></div><div class="list">${renderOrderCards(orders, "completed")}</div>`;
+  return `<div class="grid metrics"><article class="card"><span class="metric-label">Viajes en el periodo</span><div class="metric-value">${orders.length}</div></article><article class="card"><span class="metric-label">Ganancia (${courierEarningsPercentage()}%)</span><div class="metric-value metric-text">${amount}</div></article><article class="card"><span class="metric-label">Ganancia de hoy</span><div class="metric-value metric-text">${formatMoneyTotals(filteredToday(), courierEarnings)}</div></article></div><div class="section-head"><h2>Historial de viajes</h2></div><div class="list">${renderOrderCards(orders, "completed")}</div>`;
 }
 
 function filteredToday() {
@@ -1325,11 +1923,11 @@ function filteredToday() {
 
 function renderCompletedOrders() {
   const orders = state.orders.filter((order) => order.status === "delivered");
-  return `<div class="section-head"><h2>Pedidos finalizados</h2></div><div class="list">${renderOrderCards(orders, "completed")}</div>`;
+  return `<div class="section-head"><h2>Viajes finalizados</h2></div><div class="list">${renderOrderCards(orders, "completed")}</div>`;
 }
 
 function renderStaffOrders() {
-  return `<div class="toolbar"><label>Filtrar por estado<select id="staff-status"><option value="active">En curso</option><option value="pending">Sin asignar</option><option value="assigned">Asignados</option><option value="at_store">En el comercio</option><option value="in_transit">En camino</option><option value="cancelled">Cancelados</option><option value="all">Todos</option></select></label></div><div id="staff-orders" class="list">${renderOrderCards(state.orders.filter((order) => !["delivered", "cancelled"].includes(order.status)), "staff")}</div>`;
+  return `<div class="toolbar"><label>Filtrar por estado<select id="staff-status"><option value="active">En curso</option><option value="pending">Sin asignar</option><option value="assigned">Asignados</option><option value="at_store">En la recogida</option><option value="in_transit">En camino</option><option value="cancelled">Cancelados</option><option value="all">Todos</option></select></label></div><div id="staff-orders" class="list">${renderOrderCards(state.orders.filter((order) => !["delivered", "cancelled"].includes(order.status)), "staff")}</div>`;
 }
 
 function renderCreateOrder() {
@@ -1360,25 +1958,23 @@ function applicationStatusLabel(status) {
 }
 
 function renderCustomerService() {
-  if (state.customerKyc?.status !== "verified") {
-    return `<article class="card"><h2>Verifica tu perfil para solicitar</h2><p class="muted">Por seguridad, primero debes completar la verificación de identidad. Administración revisará las fotos antes de habilitar los servicios.</p><button class="button primary" data-screen="perfil_cliente">Ir a mi perfil</button></article>`;
-  }
-  const { pickup, destination, serviceType, mode } = state.serviceDraft;
+  const { pickup, destination, vehicleCategory, mode } = state.serviceDraft;
+  const verified = state.customerKyc?.status === "verified";
+  const activeTrip = activeCustomerTrip();
   const pickupLabel = pickup?.address || (pickup ? `${pickup.lat.toFixed(5)}, ${pickup.lng.toFixed(5)}` : "Selecciona la recogida en el mapa");
   const destinationLabel = destination?.address || (destination ? `${destination.lat.toFixed(5)}, ${destination.lng.toFixed(5)}` : "Selecciona el destino en el mapa");
-  return `<p class="muted">Elige el servicio y ajusta los pines de recogida y destino. La búsqueda y las rutas usan OpenStreetMap; el cálculo de distancia es una estimación del servicio público de rutas.</p>
+  const mapControls = verified
+    ? `<div class="map-point-controls"><span class="muted">Pin seleccionado para mover:</span><button type="button" class="button ${state.serviceDraft.activePoint === "pickup" ? "primary" : "subtle"} small" data-map-point="pickup">Recogida</button><button type="button" class="button ${state.serviceDraft.activePoint === "destination" ? "primary" : "subtle"} small" data-map-point="destination">Destino</button></div>`
+    : "";
+  const mapSection = `${activeTrip ? renderCustomerTripTracking(activeTrip) : ""}<article class="card"><div class="section-head"><h2>Conductores disponibles</h2><span class="muted">Ubicación aproximada · solo conductores disponibles</span></div>${mapControls}<div id="service-map" class="service-map" role="application" aria-label="Mapa de conductores disponibles y puntos del viaje"></div><p id="service-map-message" class="fine-print" role="status">Cargando conductores disponibles…</p></article>`;
+  if (!verified) {
+    return `${mapSection}<article class="card"><h2>Verifica tu perfil para solicitar</h2><p class="muted">Por seguridad, primero debes completar la verificación de identidad. Administración revisará las fotos antes de habilitar los viajes.</p><button class="button primary" data-screen="perfil_cliente">Ir a mi perfil</button></article>`;
+  }
+  return `<p class="muted">Solicita un traslado de personas. Elige vehículo, modalidad y puntos; la tarifa se calcula con la ruta por carretera.</p>${mapSection}
     <article class="card form-card service-form-card"><form id="customer-service-form" class="form-grid">
-      <label>Tipo de servicio<select id="service-type" name="serviceType" required>
-        <option value="traslado" ${serviceType === "traslado" ? "selected" : ""}>Traslado</option>
-        <option value="encomienda" ${serviceType === "encomienda" ? "selected" : ""}>Encomienda</option>
-        <option value="compra" ${serviceType === "compra" ? "selected" : ""}>Compra</option>
-        <option value="delivery" ${serviceType === "delivery" ? "selected" : ""}>Delivery</option>
-      </select></label>
-      <label id="transport-mode-field" class="${serviceType === "traslado" ? "" : "hidden"}">Modalidad<select id="transport-mode" name="transportMode">
-        <option value="express" ${mode === "express" ? "selected" : ""}>Express · $0,45/km</option>
-        <option value="economico" ${mode === "economico" ? "selected" : ""}>Económico · $0,35/km</option>
-      </select></label>
-      <label class="wide">Descripción del servicio<textarea name="description" required maxlength="1000" placeholder="${serviceType === "compra" ? "Indica lo que necesitas comprar y, si aplica, cantidades o preferencias." : serviceType === "encomienda" ? "Describe el paquete y cualquier indicación para retirarlo o entregarlo." : serviceType === "traslado" ? "Indica cuántas personas o qué deseas trasladar." : "Describe el pedido que deseas recibir."}"></textarea></label>
+      <label>Vehículo<select id="vehicle-category" name="vehicleCategory" required><option value="carro" ${vehicleCategory === "carro" ? "selected" : ""}>Carro · Express $0,90/km · Económica $0,80/km</option><option value="moto" ${vehicleCategory === "moto" ? "selected" : ""}>Moto · Express $0,40/km · Económica $0,35/km</option></select></label>
+      <label>Modalidad<select id="transport-mode" name="transportMode"><option value="express" ${mode === "express" ? "selected" : ""}>Express</option><option value="economico" ${mode === "economico" ? "selected" : ""}>Económica</option></select></label>
+      <label class="wide">Detalles para el conductor<textarea name="description" required maxlength="300" placeholder="Indicaciones para el punto de recogida">Traslado de pasajeros</textarea></label>
       <div class="wide service-points">
         <div class="section-head"><h2>Recogida</h2><span id="pickup-summary" class="muted">${escapeHtml(pickupLabel)}</span></div>
         <label>Buscar lugar<input id="pickup-search" type="search" autocomplete="off" placeholder="Ej.: CC Las Américas, Maracay"></label>
@@ -1390,21 +1986,24 @@ function renderCustomerService() {
         <label>Buscar lugar<input id="destination-search" type="search" autocomplete="off" placeholder="Busca una dirección o lugar"></label>
         <div id="destination-suggestions" class="place-suggestions" role="listbox"></div>
       </div>
-      <div class="wide"><div class="map-point-controls"><span class="muted">Pin seleccionado para mover:</span><button type="button" class="button ${state.serviceDraft.activePoint === "pickup" ? "primary" : "subtle"} small" data-map-point="pickup">Recogida</button><button type="button" class="button ${state.serviceDraft.activePoint === "destination" ? "primary" : "subtle"} small" data-map-point="destination">Destino</button></div>
-        <div id="service-map" class="service-map" role="application" aria-label="Selecciona los puntos de recogida y destino"></div>
-        <p class="fine-print">Datos del mapa y búsqueda © OpenStreetMap contributors. Puedes buscar un lugar, arrastrar cada pin o seleccionar el punto activo y tocar el mapa.</p>
-      </div>
-      <div id="service-quote" class="wide quote-message">${serviceType === "traslado" && state.serviceDraft.fee !== null ? `Distancia: ${(state.serviceDraft.distanceMeters / 1000).toFixed(2)} km · Tarifa: ${formatMoney(state.serviceDraft.fee, "USD")}` : serviceType === "traslado" ? "Selecciona ambos puntos y calcula la tarifa para ver el precio." : "Soporte revisará y cotizará este servicio antes de asignarlo."}</div>
+      <p class="wide fine-print">Datos del mapa y búsqueda © OpenStreetMap contributors. Puedes buscar un lugar, arrastrar cada pin o seleccionar el punto activo y tocar el mapa.</p>
+      <div id="service-quote" class="wide quote-message">${state.serviceDraft.fee !== null ? `Distancia: ${(state.serviceDraft.distanceMeters / 1000).toFixed(2)} km · Tarifa: ${formatMoney(state.serviceDraft.fee, "USD")}` : "Selecciona ambos puntos y calcula la tarifa para ver el precio."}</div>
       <div class="wide service-submit-row">
-        ${serviceType === "traslado" ? `<button type="button" class="button subtle" data-action="calculate-route">Calcular tarifa</button>` : ""}
-        <button class="button primary" type="submit">Solicitar servicio</button>
+        <button type="button" class="button subtle" data-action="calculate-route">Calcular ruta y tarifa</button>
+        <button class="button primary" type="submit">Solicitar traslado</button>
       </div>
     </form></article>`;
 }
 
 function renderCustomerHistory() {
-  const orders = state.orders.filter((order) => order.customer_id === state.profile.id);
-  return `<p class="muted">Solicitudes enviadas y su estado actual. Las solicitudes que requieren cotización aparecerán como pendientes hasta que soporte las revise.</p><div class="list">${renderOrderCards(orders, "customer")}</div>`;
+  const orders = state.orders.filter((order) => order.customer_id === state.profile.id && order.service_type === "traslado");
+  const activeOrder = orders.find((order) => !["delivered", "cancelled"].includes(order.status));
+  return `${activeOrder ? renderCustomerTripTracking(activeOrder) : ""}
+    <p class="muted">Tus solicitudes de traslado y su estado actual.</p><div id="customer-history-list" class="list">${renderOrderCards(orders, "customer")}</div>`;
+}
+
+function renderCustomerTripTracking(trip) {
+  return `<section class="card ride-tracking"><div class="section-head"><h2>Seguimiento del viaje</h2><span id="customer-trip-status" class="badge">${escapeHtml(RIDE_STATUS_NAMES[trip.status] || trip.status)}</span></div><div id="customer-trip-map" class="service-map" role="application" aria-label="Ubicación del conductor y ruta del viaje"></div><p id="customer-trip-map-message" class="fine-print" role="status">Actualizando ubicación del conductor…</p></section>`;
 }
 
 function renderCustomerProfile() {
@@ -1419,29 +2018,25 @@ function renderCustomerProfile() {
       ? `<article class="card"><h3>Verificación en revisión</h3><p class="muted">Tu documentación fue enviada el ${dateTime(kyc.submitted_at)}. Te avisaremos aquí cuando administración la revise.</p></article>`
       : kyc?.status === "rejected"
         ? `<article class="card"><h3>Verificación rechazada</h3><p class="muted">${escapeHtml(kyc.rejection_reason || "Revisa las imágenes y vuelve a enviarlas.")}</p>${kycForm}</article>`
-        : `<article class="card"><h3>Perfil verificado</h3><p class="muted">Tu identidad fue verificada. Ya puedes solicitar servicios y postularte como motorizado o aliado comercial.</p></article>`;
+        : `<article class="card"><h3>Perfil verificado</h3><p class="muted">Tu identidad fue verificada. Ya puedes solicitar traslados y postularte como conductor.</p></article>`;
   const previousApplications = state.serviceApplications.filter((application) => application.user_id === state.profile.id);
   const applicationForm = verified ? `<form id="service-application-form" class="form-grid card">
-    <h3 class="wide">Quiero postularme</h3>
-    <label class="wide">Tipo de postulación<select name="applicationType" id="application-type"><option value="motorizado">Motorizado</option><option value="aliado">Aliado comercial</option></select></label>
+    <h3 class="wide">Quiero conducir con EnRuta2</h3>
+    <label class="wide">Tipo de postulación<select name="applicationType" id="application-type"><option value="motorizado">Conductor</option></select></label>
     <div id="courier-application-fields" class="wide stack">
+      <label>Vehículo<select name="vehicleCategory" required><option value="carro">Carro</option><option value="moto">Moto</option></select></label>
       <label class="inline-checkbox"><input type="checkbox" name="availableImmediately">Disponibilidad inmediata</label>
       <fieldset class="schedule-options"><legend>Horarios disponibles</legend><label class="inline-checkbox"><input type="checkbox" name="schedule" value="tarde">Tarde</label><label class="inline-checkbox"><input type="checkbox" name="schedule" value="noche">Noche</label><label class="inline-checkbox"><input type="checkbox" name="schedule" value="tiempo_completo">Tiempo completo</label></fieldset>
-      <label>Foto de la moto<input type="file" name="motorcyclePhoto" accept="image/jpeg,image/png,image/webp" required></label>
+      <label>Foto del vehículo<input type="file" name="motorcyclePhoto" accept="image/jpeg,image/png,image/webp" required></label>
       <label>Licencia de conducir<input type="file" name="driverLicense" accept="image/jpeg,image/png,image/webp" required></label>
       <label>Certificado médico<input type="file" name="medicalCertificate" accept="image/jpeg,image/png,image/webp" required></label>
       <label>RCV vigente<input type="file" name="rcv" accept="image/jpeg,image/png,image/webp" required></label>
     </div>
-    <div id="ally-application-fields" class="wide form-grid hidden">
-      <label>Nombre comercial<input name="businessName" required></label><label>RIF<input name="businessTaxId" required></label>
-      <label>Tipo de negocio<input name="businessType" required></label><label>Teléfono<input name="businessPhone" value="${escapeHtml(state.profile.phone || "")}" required></label>
-      <label class="wide">Dirección comercial<input name="businessAddress" required></label>
-    </div>
     <div class="wide"><button type="submit" class="button primary">Enviar postulación</button></div>
   </form>` : "";
-  const applicationRows = previousApplications.map((application) => `<article class="card"><div class="order-top"><div><h3>${application.application_type === "motorizado" ? "Postulación de motorizado" : `Aliado · ${escapeHtml(application.business_name || "")}`}</h3><p class="muted">Enviada ${dateTime(application.submitted_at)}</p></div><span class="badge ${application.status === "approved" ? "green" : application.status === "rejected" ? "orange" : ""}">${applicationStatusLabel(application.status)}</span></div>${application.rejection_reason ? `<p class="muted">Motivo: ${escapeHtml(application.rejection_reason)}</p>` : ""}</article>`).join("");
+  const applicationRows = previousApplications.map((application) => `<article class="card"><div class="order-top"><div><h3>${application.application_type === "motorizado" ? `Postulación de conductor · ${application.vehicle_category === "carro" ? "Carro" : "Moto"}` : "Solicitud comercial archivada"}</h3><p class="muted">Enviada ${dateTime(application.submitted_at)}</p></div><span class="badge ${application.status === "approved" ? "green" : application.status === "rejected" ? "orange" : ""}">${applicationStatusLabel(application.status)}</span></div>${application.rejection_reason ? `<p class="muted">Motivo: ${escapeHtml(application.rejection_reason)}</p>` : ""}</article>`).join("");
   return `<div class="grid two"><article class="card profile-card"><img id="customer-avatar" class="profile-avatar hidden" alt="Foto de perfil verificada"><div><h2>Mi perfil</h2><p><strong>${escapeHtml(state.profile.full_name)}</strong></p><p class="muted">@${escapeHtml(state.profile.username)} · ${escapeHtml(state.profile.phone || "Sin teléfono")}</p><p>Estado KYC: <span class="badge ${verified ? "green" : kyc?.status === "rejected" ? "orange" : ""}">${kycStatusLabel(kyc?.status)}</span></p></div></article>${kycForm}</div>
-    <div class="section-head"><h2>Quiero ser motorizado o aliado</h2></div>${verified ? applicationForm : `<div class="empty">Completa y aprueba tu verificación KYC para enviar una postulación.</div>`}
+    <div class="section-head"><h2>Quiero ser conductor</h2></div>${verified ? applicationForm : `<div class="empty">Completa y aprueba tu verificación KYC para enviar una postulación.</div>`}
     <div class="section-head"><h2>Mis postulaciones</h2></div><div class="list">${applicationRows || `<div class="empty">Aún no tienes postulaciones.</div>`}</div>`;
 }
 
@@ -1456,33 +2051,39 @@ function renderKycReviews() {
 }
 
 function renderApplicationReviews() {
-  if (!state.serviceApplications.length) return `<div class="empty">Aún no hay postulaciones de motorizados o aliados.</div>`;
-  return `<p class="muted">Revisa los datos de cada aspirante y los documentos privados de las postulaciones de motorizado.</p><div class="list">${state.serviceApplications.map((item) => {
+  if (!state.serviceApplications.length) return `<div class="empty">Aún no hay postulaciones de conductores.</div>`;
+  return `<p class="muted">Revisa el vehículo, la identidad y los documentos privados de cada aspirante a conductor.</p><div class="list">${state.serviceApplications.map((item) => {
     const user = item.profiles || {};
     const files = item.application_type === "motorizado"
-      ? [["Foto de la moto", item.motorcycle_photo_path], ["Licencia", item.driver_license_path], ["Certificado médico", item.medical_certificate_path], ["RCV", item.rcv_path]]
+      ? [["Foto del vehículo", item.motorcycle_photo_path], ["Licencia", item.driver_license_path], ["Certificado médico", item.medical_certificate_path], ["RCV", item.rcv_path]]
         .map(([label, path]) => `<button class="button subtle small" data-action="private-file" data-bucket="applicant-documents" data-path="${escapeHtml(path)}">${label}</button>`).join("")
       : "";
     const details = item.application_type === "motorizado"
-      ? `Disponibilidad: ${item.available_immediately ? "inmediata" : "por horario"} · Horarios: ${escapeHtml((item.schedules || []).join(", ") || "No indicados")}`
+      ? `Vehículo: ${item.vehicle_category === "carro" ? "Carro" : "Moto"} · Disponibilidad: ${item.available_immediately ? "inmediata" : "por horario"} · Horarios: ${escapeHtml((item.schedules || []).join(", ") || "No indicados")}`
       : `Comercio: ${escapeHtml(item.business_name)} · RIF: ${escapeHtml(item.business_tax_id)} · ${escapeHtml(item.business_type)} · ${escapeHtml(item.business_address)} · ${escapeHtml(item.business_phone)}`;
-    const actions = item.status === "pending"
+    const actions = item.status === "pending" && item.application_type === "motorizado"
       ? `<button class="button success small" data-action="review-application" data-id="${item.id}" data-decision="approved">Aprobar</button><button class="button danger small" data-action="review-application" data-id="${item.id}" data-decision="rejected">Rechazar</button>`
-      : "";
-    return `<article class="card"><div class="order-top"><div><h3>${item.application_type === "motorizado" ? "Aspirante a motorizado" : "Aspirante a aliado comercial"}</h3><p>${escapeHtml(user.full_name || "Usuario")} · @${escapeHtml(user.username || "")} · ${escapeHtml(user.phone || "")}</p><p class="muted">${escapeHtml(details)}</p><p class="muted">Enviada ${dateTime(item.submitted_at)}</p></div><span class="badge ${item.status === "approved" ? "green" : item.status === "rejected" ? "orange" : ""}">${applicationStatusLabel(item.status)}</span></div>${item.rejection_reason ? `<p class="muted">Motivo: ${escapeHtml(item.rejection_reason)}</p>` : ""}<div class="order-actions">${files}${actions}</div></article>`;
+      : item.status === "pending"
+        ? `<button class="button danger small" data-action="review-application" data-id="${item.id}" data-decision="rejected">Cerrar solicitud antigua</button>`
+        : "";
+    return `<article class="card"><div class="order-top"><div><h3>${item.application_type === "motorizado" ? "Aspirante a conductor" : "Solicitud comercial archivada"}</h3><p>${escapeHtml(user.full_name || "Usuario")} · @${escapeHtml(user.username || "")} · ${escapeHtml(user.phone || "")}</p><p class="muted">${escapeHtml(details)}</p><p class="muted">Enviada ${dateTime(item.submitted_at)}</p></div><span class="badge ${item.status === "approved" ? "green" : item.status === "rejected" ? "orange" : ""}">${applicationStatusLabel(item.status)}</span></div>${item.rejection_reason ? `<p class="muted">Motivo: ${escapeHtml(item.rejection_reason)}</p>` : ""}<div class="order-actions">${files}${actions}</div></article>`;
   }).join("")}</div>`;
 }
 
 function destroyServiceMap() {
+  clearInterval(state.serviceAvailabilityTimer);
+  state.serviceAvailabilityTimer = null;
   if (state.serviceMap) state.serviceMap.remove();
   state.serviceMap = null;
   state.serviceMarkers = {};
+  state.serviceDriverMarkers = null;
+  state.serviceRouteLayer = null;
   state.serviceMapContainer = null;
 }
 
 async function initializeServiceMap() {
   const container = document.querySelector("#service-map");
-  if (!container || state.customerKyc?.status !== "verified") return;
+  if (!container || state.profile?.role !== "cliente") return;
   try {
     const leaflet = await loadLeaflet();
     if (state.screen !== "servicio" || !container.isConnected) return;
@@ -1495,6 +2096,7 @@ async function initializeServiceMap() {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
       }).addTo(state.serviceMap);
+      state.serviceDriverMarkers = leaflet.layerGroup().addTo(state.serviceMap);
       state.serviceMap.on("click", (event) => {
         updateServicePoint(state.serviceDraft.activePoint, {
           lat: event.latlng.lat,
@@ -1506,6 +2108,10 @@ async function initializeServiceMap() {
     for (const point of ["pickup", "destination"]) {
       if (state.serviceDraft[point]) updateServiceMarker(point);
     }
+    renderServiceRoute();
+    void refreshCustomerServiceMarkers();
+    clearInterval(state.serviceAvailabilityTimer);
+    state.serviceAvailabilityTimer = setInterval(() => void refreshCustomerServiceMarkers(), 15000);
     setTimeout(() => {
       state.serviceMap?.invalidateSize();
       fitServiceMapToPoints();
@@ -1513,6 +2119,45 @@ async function initializeServiceMap() {
   } catch (error) {
     console.error("No se pudo inicializar el mapa de solicitud:", error);
     showToast(error.message || "No se pudo cargar el mapa.", true);
+  }
+}
+
+async function refreshCustomerServiceMarkers() {
+  if (!state.serviceMap || state.profile?.role !== "cliente") return;
+  const message = document.querySelector("#service-map-message");
+  const { data, error } = await supabase.rpc("get_available_couriers");
+  if (error) {
+    state.availableCourierLocations = [];
+    if (message) message.textContent = `No se pudieron cargar los conductores disponibles: ${error.message}`;
+    console.error("No se pudieron consultar conductores disponibles:", error);
+    renderServiceCourierMarkers();
+    return;
+  }
+  state.availableCourierLocations = data || [];
+  renderServiceCourierMarkers();
+  if (message) {
+    message.textContent = state.availableCourierLocations.length
+      ? `${state.availableCourierLocations.length} conductor(es) disponible(s). Las posiciones se muestran de forma aproximada.`
+      : "No hay conductores disponibles con GPS reciente.";
+  }
+}
+
+function renderServiceCourierMarkers() {
+  if (!state.serviceMap || !state.serviceDriverMarkers) return;
+  const leaflet = window.L;
+  state.serviceDriverMarkers.clearLayers();
+  for (const driver of state.availableCourierLocations) {
+    const latitude = Number(driver.latitude);
+    const longitude = Number(driver.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+    const vehicle = driver.vehicle_category === "carro" ? "Carro disponible" : "Moto disponible";
+    leaflet.circleMarker([latitude, longitude], {
+      radius: 8,
+      color: "#fff",
+      weight: 2,
+      fillColor: driver.vehicle_category === "carro" ? "#8d54ef" : "#42d392",
+      fillOpacity: 0.9
+    }).bindPopup(vehicle).addTo(state.serviceDriverMarkers);
   }
 }
 
@@ -1545,6 +2190,9 @@ function updateServicePoint(point, location, centerMap = true) {
   state.serviceDraft[point] = { lat: Number(location.lat), lng: Number(location.lng), address: location.address || null };
   state.serviceDraft.fee = null;
   state.serviceDraft.distanceMeters = null;
+  state.serviceDraft.routeCoordinates = null;
+  state.serviceRouteLayer?.remove();
+  state.serviceRouteLayer = null;
   const summary = document.querySelector(`#${point}-summary`);
   if (summary) summary.textContent = state.serviceDraft[point].address || `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;
   if (state.serviceMap && document.querySelector("#service-map")) {
@@ -1552,7 +2200,16 @@ function updateServicePoint(point, location, centerMap = true) {
     if (!fitServiceMapToPoints() && centerMap) state.serviceMap.flyTo([location.lat, location.lng], 16);
   }
   const quote = document.querySelector("#service-quote");
-  if (quote && state.serviceDraft.serviceType === "traslado") quote.textContent = "La ubicación cambió. Vuelve a calcular la tarifa.";
+  if (quote) quote.textContent = "La ubicación cambió. Vuelve a calcular la ruta y la tarifa.";
+}
+
+function renderServiceRoute() {
+  if (!state.serviceMap || !state.serviceDraft.routeCoordinates?.length) return;
+  state.serviceRouteLayer?.remove();
+  state.serviceRouteLayer = window.L.polyline(
+    state.serviceDraft.routeCoordinates.map(([longitude, latitude]) => [latitude, longitude]),
+    { color: "#18795b", weight: 5, opacity: 0.9 }
+  ).addTo(state.serviceMap);
 }
 
 async function searchPlaces(point, query) {
@@ -1626,35 +2283,42 @@ function estimateDrivingDistanceMeters(pickup, destination) {
 }
 
 async function calculateServiceRoute() {
-  const { pickup, destination, mode } = state.serviceDraft;
+  const { pickup, destination, mode, vehicleCategory } = state.serviceDraft;
   if (!pickup || !destination) return showToast("Selecciona la recogida y el destino en el mapa.", true);
-  let distanceMeters;
-  let usedFallback = false;
   try {
     const coordinates = `${pickup.lng},${pickup.lat};${destination.lng},${destination.lat}`;
-    const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=false&steps=false`);
+    const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=false`);
     if (!response.ok) throw new Error(`El servicio de rutas respondió HTTP ${response.status}.`);
     const result = await response.json();
-    distanceMeters = result.code === "Ok" ? result.routes?.[0]?.distance : null;
-    if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
-      return reportError(new Error("No se encontró una ruta vehicular entre los puntos seleccionados."));
+    const route = result.code === "Ok" ? result.routes?.[0] : null;
+    const distanceMeters = Number(route?.distance);
+    const routeCoordinates = route?.geometry?.coordinates;
+    if (!Number.isFinite(distanceMeters) || distanceMeters <= 0 || !Array.isArray(routeCoordinates) || routeCoordinates.length < 2) {
+      throw new Error("No se encontró una ruta vehicular entre los puntos seleccionados.");
     }
+    const rate = VEHICLE_RATES[vehicleCategory]?.[mode];
+    if (!rate) throw new Error("La combinación de vehículo y modalidad no es válida.");
+    const roundedDistanceMeters = Math.round(distanceMeters);
+    const fee = Math.round((roundedDistanceMeters / 1000) * rate * 100 + Number.EPSILON) / 100;
+    state.serviceDraft.distanceMeters = roundedDistanceMeters;
+    state.serviceDraft.routeCoordinates = routeCoordinates;
+    state.serviceDraft.fee = fee;
+    renderServiceRoute();
+    state.serviceMap?.fitBounds(state.serviceRouteLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
+    const quote = document.querySelector("#service-quote");
+    if (quote) quote.textContent = `Ruta por carretera: ${(distanceMeters / 1000).toFixed(2)} km · ${vehicleCategory === "carro" ? "Carro" : "Moto"} ${mode === "express" ? "Express" : "Económica"} · Tarifa: ${formatMoney(fee, "USD")}`;
+    return true;
   } catch (error) {
-    console.warn("No se pudo consultar la ruta comunitaria; se usará una estimación aproximada:", error);
-    distanceMeters = estimateDrivingDistanceMeters(pickup, destination);
-    usedFallback = true;
+    state.serviceDraft.distanceMeters = null;
+    state.serviceDraft.routeCoordinates = null;
+    state.serviceDraft.fee = null;
+    state.serviceRouteLayer?.remove();
+    state.serviceRouteLayer = null;
+    const quote = document.querySelector("#service-quote");
+    if (quote) quote.textContent = `No se pudo calcular la ruta: ${error.message}`;
+    reportError(error);
+    return false;
   }
-  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
-    return reportError(new Error("Los puntos de recogida y destino deben ser distintos para calcular el traslado."));
-  }
-  const rate = mode === "express" ? 0.45 : 0.35;
-  const fee = Math.round((distanceMeters / 1000) * rate * 100) / 100;
-  state.serviceDraft.distanceMeters = Math.round(distanceMeters);
-  state.serviceDraft.fee = fee;
-  const quote = document.querySelector("#service-quote");
-  if (quote) quote.textContent = `${usedFallback ? "Estimación aproximada (distancia directa + 30%)" : "Distancia estimada por carretera"}: ${(distanceMeters / 1000).toFixed(2)} km · Tarifa estimada: ${formatMoney(fee, "USD")}`;
-  if (usedFallback) showToast("El servicio de rutas no respondió; se usó una estimación aproximada. Soporte revisará el precio.");
-  return true;
 }
 
 async function requestCustomerService(event) {
@@ -1663,14 +2327,16 @@ async function requestCustomerService(event) {
   const data = new FormData(form);
   const { pickup, destination } = state.serviceDraft;
   if (!pickup || !destination) return showToast("Selecciona la recogida y el destino en el mapa.", true);
-  const serviceType = String(data.get("serviceType"));
-  if (serviceType === "traslado") {
-    if (!await calculateServiceRoute()) return;
-  }
+  const vehicleCategory = String(data.get("vehicleCategory"));
+  const transportMode = String(data.get("transportMode"));
+  state.serviceDraft.vehicleCategory = vehicleCategory;
+  state.serviceDraft.mode = transportMode;
+  if (!await calculateServiceRoute()) return;
   const { error } = await supabase.rpc("create_customer_service_order", {
     p_customer_id: state.profile.id,
-    p_service_type: serviceType,
-    p_transport_mode: serviceType === "traslado" ? data.get("transportMode") : null,
+    p_service_type: "traslado",
+    p_transport_mode: transportMode,
+    p_vehicle_category: vehicleCategory,
     p_description: String(data.get("description")).trim(),
     p_pickup_address: pickup.address || `${pickup.lat}, ${pickup.lng}`,
     p_destination_address: destination.address || `${destination.lat}, ${destination.lng}`,
@@ -1678,16 +2344,14 @@ async function requestCustomerService(event) {
     p_pickup_longitude: pickup.lng,
     p_destination_latitude: destination.lat,
     p_destination_longitude: destination.lng,
-    p_route_distance_meters: serviceType === "traslado" ? state.serviceDraft.distanceMeters : null,
-    p_delivery_fee: serviceType === "traslado" ? state.serviceDraft.fee : 0
+    p_route_distance_meters: state.serviceDraft.distanceMeters,
+    p_delivery_fee: state.serviceDraft.fee
   });
   if (error) return reportError(error);
-  showToast(serviceType === "traslado"
-    ? `Solicitud enviada. Tarifa estimada: ${formatMoney(state.serviceDraft.fee, "USD")}. Soporte la revisará.`
-    : "Solicitud enviada; soporte la revisará y cotizará.");
+  showToast(`Solicitud enviada. Tarifa: ${formatMoney(state.serviceDraft.fee, "USD")}. Soporte liberará el viaje.`);
   state.screen = "historial_cliente";
   destroyServiceMap();
-  state.serviceDraft = { pickup: null, destination: null, activePoint: "pickup", mode: "express", serviceType: "traslado", distanceMeters: null, fee: null };
+  state.serviceDraft = { pickup: null, destination: null, activePoint: "pickup", vehicleCategory: "carro", mode: "express", serviceType: "traslado", distanceMeters: null, fee: null, routeCoordinates: null };
   await refreshData(false);
   renderApp();
 }
@@ -1771,11 +2435,10 @@ function updateApplicationFormFields() {
   const type = document.querySelector("#application-type")?.value;
   const courierFields = document.querySelector("#courier-application-fields");
   const allyFields = document.querySelector("#ally-application-fields");
-  if (!courierFields || !allyFields) return;
+  if (!courierFields) return;
   courierFields.classList.toggle("hidden", type !== "motorizado");
-  allyFields.classList.toggle("hidden", type !== "aliado");
   courierFields.querySelectorAll("input[required]").forEach((field) => { field.required = type === "motorizado"; });
-  allyFields.querySelectorAll("input[required]").forEach((field) => { field.required = type === "aliado"; });
+  allyFields?.classList.add("hidden");
 }
 
 async function submitServiceApplication(event) {
@@ -1798,11 +2461,7 @@ async function submitServiceApplication(event) {
       p_type: type,
       p_available_immediately: data.has("availableImmediately"),
       p_schedules: data.getAll("schedule"),
-      p_business_name: data.get("businessName") || null,
-      p_business_tax_id: data.get("businessTaxId") || null,
-      p_business_type: data.get("businessType") || null,
-      p_business_address: data.get("businessAddress") || null,
-      p_business_phone: data.get("businessPhone") || null
+      p_vehicle_category: String(data.get("vehicleCategory") || "moto"),
     };
     if (type === "motorizado") {
       parameters.p_motorcycle_photo_path = await pathFor("motorcyclePhoto");
@@ -1897,13 +2556,20 @@ function renderUsers() {
     return matchesRole && matchesSearch;
   });
   const roleTabs = [
-    ["all", "Todos"], ["cliente", "Clientes"], ["motorizado", "Motorizados"], ["aliado", "Aliados"],
+    ["all", "Todos"], ["cliente", "Pasajeros"], ["motorizado", "Conductores"], ["aliado", "Cuentas archivadas"],
     ["soporte", "Soporte"], ["administracion", "Administración"]
   ];
-  const rows = visibleProfiles.map((profile) => `<tr><td>@${escapeHtml(profile.username)}</td><td><input aria-label="Nombre completo" data-profile-name="${profile.id}" value="${escapeHtml(profile.full_name)}"><input aria-label="Teléfono" data-profile-phone="${profile.id}" value="${escapeHtml(profile.phone || "")}" style="margin-top:6px"></td><td><select data-action="role" data-id="${profile.id}"><option value="">Sin rol</option>${Object.entries(roleNames).map(([value, label]) => `<option value="${value}" ${profile.role === value ? "selected" : ""}>${label}</option>`).join("")}</select>${profile.role === "motorizado" ? `<label class="muted">Porcentaje de ganancia <input type="number" min="0" max="100" step="1" data-profile-percentage="${profile.id}" value="${Number(profile.earnings_percentage ?? 70)}">%</label>` : ""}</td><td><select aria-label="Aliado del usuario" data-profile-ally="${profile.id}"><option value="">Sin aliado</option>${state.allies.map((ally) => `<option value="${ally.id}" ${profile.ally_id === ally.id ? "selected" : ""}>${escapeHtml(ally.name)}</option>`).join("")}</select></td><td>${profile.suspended ? `<span class="badge">Suspendido</span>` : profile.approved ? `<span class="badge green">${profile.online ? "Activo" : "Aprobado"}</span>` : `<span class="badge orange">Pendiente</span>`}</td><td class="user-actions"><button class="button subtle small" data-action="save-profile" data-id="${profile.id}">Guardar</button><button class="button ${profile.suspended ? "success" : "danger"} small" data-action="suspend" data-id="${profile.id}" data-suspended="${profile.suspended}">${profile.suspended ? "Reactivar" : "Suspender"}</button><button class="button danger small" data-action="delete-user" data-id="${profile.id}">Eliminar</button></td></tr>`).join("");
+  const assignableRoles = Object.entries(roleNames).filter(([role]) => role !== "aliado");
+  const rows = visibleProfiles.map((profile) => {
+    const roleOptions = `${profile.role === "aliado" ? `<option value="aliado" selected disabled>Cuenta archivada</option>` : ""}${assignableRoles.map(([value, label]) => `<option value="${value}" ${profile.role === value ? "selected" : ""}>${label}</option>`).join("")}`;
+    const driverFields = profile.role === "motorizado"
+      ? `<label class="muted">Vehículo<select data-profile-vehicle="${profile.id}"><option value="carro" ${profile.vehicle_category === "carro" ? "selected" : ""}>Carro</option><option value="moto" ${profile.vehicle_category !== "carro" ? "selected" : ""}>Moto</option></select></label><label class="muted">Ganancia (%)<input type="number" min="0" max="100" step="1" data-profile-percentage="${profile.id}" value="${Number(profile.earnings_percentage ?? 70)}"></label>`
+      : "";
+    return `<tr><td>@${escapeHtml(profile.username)}</td><td><input aria-label="Nombre completo" data-profile-name="${profile.id}" value="${escapeHtml(profile.full_name)}"><input aria-label="Teléfono" data-profile-phone="${profile.id}" value="${escapeHtml(profile.phone || "")}" style="margin-top:6px"></td><td><select data-action="role" data-id="${profile.id}"><option value="">Sin rol</option>${roleOptions}</select>${driverFields}</td><td><select aria-label="Cuenta heredada" data-profile-ally="${profile.id}"><option value="">Sin asignación</option>${state.allies.map((ally) => `<option value="${ally.id}" ${profile.ally_id === ally.id ? "selected" : ""}>${escapeHtml(ally.name)}</option>`).join("")}</select></td><td>${profile.suspended ? `<span class="badge">Suspendido</span>` : profile.approved ? `<span class="badge green">${profile.online ? "Activo" : "Aprobado"}</span>` : `<span class="badge orange">Pendiente</span>`}</td><td class="user-actions"><button class="button subtle small" data-action="save-profile" data-id="${profile.id}">Guardar</button><button class="button ${profile.suspended ? "success" : "danger"} small" data-action="suspend" data-id="${profile.id}" data-suspended="${profile.suspended}">${profile.suspended ? "Reactivar" : "Suspender"}</button><button class="button danger small" data-action="delete-user" data-id="${profile.id}">Eliminar</button></td></tr>`;
+  }).join("");
   return `<div class="section-head"><h2>Usuarios y permisos</h2><span class="badge">${visibleProfiles.length} usuarios</span></div>
     <div class="toolbar users-toolbar"><label class="wide">Buscar usuario<input id="users-search" type="search" placeholder="Nombre, usuario o teléfono" value="${escapeHtml(state.usersSearch)}"></label><div class="wide" style="display:flex;gap:8px;flex-wrap:wrap">${roleTabs.map(([role, label]) => `<button type="button" class="button ${state.usersRole === role ? "primary" : "subtle"} small" data-user-role="${role}">${label}</button>`).join("")}</div></div>
-    <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Nombre y teléfono</th><th>Rol / porcentaje</th><th>Aliado asignado</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows || `<tr><td colspan="6" class="muted">No hay usuarios que coincidan.</td></tr>`}</tbody></table></div><p class="fine-print">El porcentaje de ganancia se aplica sobre el costo de cada delivery. Las amonestaciones se pueden reflejar reduciendo este porcentaje.</p>`;
+    <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Nombre y teléfono</th><th>Rol / vehículo / ganancia</th><th>Cuenta heredada</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows || `<tr><td colspan="6" class="muted">No hay usuarios que coincidan.</td></tr>`}</tbody></table></div><p class="fine-print">La ganancia del conductor se calcula como porcentaje de la tarifa del viaje. Las cuentas comerciales antiguas se conservan archivadas.</p>`;
 }
 
 function renderReports() {
@@ -1911,12 +2577,12 @@ function renderReports() {
   const todayDelivered = delivered.filter((order) => new Date(order.delivered_at) >= dayStart());
   const createdToday = state.orders.filter((order) => new Date(order.created_at) >= dayStart());
   const couriers = state.profiles.filter((profile) => profile.role === "motorizado");
-  return `<div class="grid metrics"><article class="card"><span class="metric-label">Pedidos creados hoy</span><div class="metric-value">${createdToday.length}</div><span class="metric-foot">${todayDelivered.length} entregados</span></article><article class="card"><span class="metric-label">Delivery generado hoy</span><div class="metric-value metric-text">${formatMoneyTotals(todayDelivered, (order) => order.delivery_fee)}</div></article><article class="card"><span class="metric-label">Motorizados activos</span><div class="metric-value">${countOnline()}</div></article></div>
-    <div class="section-head"><h2>Reportes de entregas</h2></div><div class="toolbar">
+  return `<div class="grid metrics"><article class="card"><span class="metric-label">Viajes solicitados hoy</span><div class="metric-value">${createdToday.length}</div><span class="metric-foot">${todayDelivered.length} finalizados</span></article><article class="card"><span class="metric-label">Tarifas de viajes hoy</span><div class="metric-value metric-text">${formatMoneyTotals(todayDelivered, (order) => order.delivery_fee)}</div></article><article class="card"><span class="metric-label">Conductores activos</span><div class="metric-value">${countOnline()}</div></article></div>
+    <div class="section-head"><h2>Reportes de viajes</h2></div><div class="toolbar">
       <label>Desde<input type="date" id="report-from"></label>
       <label>Hasta<input type="date" id="report-to"></label>
-      <label>Motorizado<select id="report-courier"><option value="">Todos los motorizados</option>${couriers.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.full_name)}</option>`).join("")}</select></label>
-      <label>Aliado<select id="report-ally"><option value="">Todos los aliados</option>${state.allies.map((ally) => `<option value="${ally.id}">${escapeHtml(ally.name)}</option>`).join("")}</select></label>
+      <label>Conductor<select id="report-courier"><option value="">Todos los conductores</option>${couriers.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.full_name)}</option>`).join("")}</select></label>
+      <label>Vehículo<select id="report-vehicle"><option value="">Todos</option><option value="carro">Carro</option><option value="moto">Moto</option></select></label>
       <button class="button primary" data-action="export">Descargar reporte Excel</button>
     </div>
     <div id="report-table" class="table-wrap">${reportTable(reportOrders())}</div>`;
@@ -1958,13 +2624,13 @@ function renderMetrics() {
 
   for (const order of deliveredToday) {
     if (!order.courier_id) continue;
-    const existing = ordersByCourier.get(order.courier_id) || courierMetrics(order.courier?.full_name || order.courier_name || "Motorizado");
+    const existing = ordersByCourier.get(order.courier_id) || courierMetrics(order.courier?.full_name || order.courier_name || "Conductor");
     existing.orders.push(order);
     ordersByCourier.set(order.courier_id, existing);
   }
 
   for (const order of createdToday.filter((item) => item.assigned_at && item.courier_id)) {
-    const existing = ordersByCourier.get(order.courier_id) || courierMetrics(order.courier?.full_name || order.courier_name || "Motorizado");
+    const existing = ordersByCourier.get(order.courier_id) || courierMetrics(order.courier?.full_name || order.courier_name || "Conductor");
     existing.acceptanceOrders.push(order);
     ordersByCourier.set(order.courier_id, existing);
   }
@@ -1986,31 +2652,31 @@ function renderMetrics() {
   }).join("");
 
   return `<div class="grid metrics">
-    <article class="card"><span class="metric-label">Pedidos entregados hoy</span><div class="metric-value">${deliveredToday.length}</div></article>
-    <article class="card"><span class="metric-label">Motorizado con más entregas</span><div class="metric-value metric-text">${escapeHtml(topCourier)}</div><span class="metric-foot">${ranking[0]?.orders.length || 0} pedidos completados hoy</span></article>
-    <article class="card"><span class="metric-label">Promedio de aceptación</span><div class="metric-value">${formatDuration(avgAcceptance)}</div><span class="metric-foot">Desde creación hasta asignación, pedidos creados hoy</span></article>
-    <article class="card"><span class="metric-label">Promedio de entrega</span><div class="metric-value">${formatDuration(avgDelivery)}</div><span class="metric-foot">Desde llegada al comercio hasta entrega, finalizados hoy</span></article>
+    <article class="card"><span class="metric-label">Viajes finalizados hoy</span><div class="metric-value">${deliveredToday.length}</div></article>
+    <article class="card"><span class="metric-label">Conductor con más viajes</span><div class="metric-value metric-text">${escapeHtml(topCourier)}</div><span class="metric-foot">${ranking[0]?.orders.length || 0} viajes completados hoy</span></article>
+    <article class="card"><span class="metric-label">Promedio de asignación</span><div class="metric-value">${formatDuration(avgAcceptance)}</div><span class="metric-foot">Desde solicitud hasta asignación, viajes de hoy</span></article>
+    <article class="card"><span class="metric-label">Promedio de viaje</span><div class="metric-value">${formatDuration(avgDelivery)}</div><span class="metric-foot">Desde la recogida hasta la finalización</span></article>
   </div>
-  <div class="section-head"><h2>Desempeño de motorizados · hoy</h2></div>
-  <div class="table-wrap"><table><thead><tr><th>Motorizado</th><th>Pedidos entregados</th><th>Promedio de aceptación</th><th>Promedio de entrega</th></tr></thead><tbody>${rankingRows || `<tr><td colspan="4">No hay motorizados registrados.</td></tr>`}</tbody></table></div>`;
+  <div class="section-head"><h2>Desempeño de conductores · hoy</h2></div>
+  <div class="table-wrap"><table><thead><tr><th>Conductor</th><th>Viajes finalizados</th><th>Promedio de asignación</th><th>Promedio de viaje</th></tr></thead><tbody>${rankingRows || `<tr><td colspan="4">No hay conductores registrados.</td></tr>`}</tbody></table></div>`;
 }
 
 function reportTable(orders) {
-  return `<table><thead><tr><th>Aliado / servicio</th><th>Cliente</th><th>Dirección / destino</th><th>Motorizado</th><th>Creado por</th><th>Hora comercio</th><th>Hora entrega</th><th>Fecha</th><th>Delivery</th></tr></thead><tbody>${orders.length ? orders.map((order) => `<tr><td>${escapeHtml(order.allies?.name || order.service_type || "—")}</td><td>${escapeHtml(order.client_name)}</td><td>${escapeHtml(order.destination_address || order.address || "—")}</td><td>${escapeHtml(order.courier?.full_name || order.courier_name || "")}</td><td>${escapeHtml(order.creator?.full_name || order.creator_name || "—")}</td><td>${dateTime(order.at_store_at)}</td><td>${dateTime(order.delivered_at)}</td><td>${new Date(order.delivered_at).toLocaleDateString("es-CO")}</td><td>${formatMoney(order.delivery_fee, order.currency)}</td></tr>`).join("") : `<tr><td colspan="9">Sin pedidos para el periodo seleccionado.</td></tr>`}</tbody></table>`;
+  return `<table><thead><tr><th>Pasajero</th><th>Vehículo / modalidad</th><th>Recogida</th><th>Destino</th><th>Conductor</th><th>Hora de recogida</th><th>Hora de finalización</th><th>Fecha</th><th>Tarifa</th></tr></thead><tbody>${orders.length ? orders.map((order) => `<tr><td>${escapeHtml(order.client_name)}</td><td>${order.vehicle_category === "carro" ? "Carro" : "Moto"} · ${order.transport_mode === "express" ? "Express" : "Económica"}</td><td>${escapeHtml(order.pickup_address || "—")}</td><td>${escapeHtml(order.destination_address || "—")}</td><td>${escapeHtml(order.courier?.full_name || order.courier_name || "")}</td><td>${dateTime(order.at_store_at)}</td><td>${dateTime(order.delivered_at)}</td><td>${new Date(order.delivered_at).toLocaleDateString("es-CO")}</td><td>${formatMoney(order.delivery_fee, order.currency)}</td></tr>`).join("") : `<tr><td colspan="9">Sin viajes para el periodo seleccionado.</td></tr>`}</tbody></table>`;
 }
 
 function reportOrders() {
   const from = document.querySelector("#report-from")?.value;
   const to = document.querySelector("#report-to")?.value;
   const courierId = document.querySelector("#report-courier")?.value;
-  const allyId = document.querySelector("#report-ally")?.value;
+  const vehicleCategory = document.querySelector("#report-vehicle")?.value;
   const endExclusive = to ? new Date(`${to}T00:00:00`) : null;
   if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1);
   return state.orders.filter((order) => order.status === "delivered"
     && (!from || new Date(order.delivered_at) >= new Date(`${from}T00:00:00`))
     && (!endExclusive || new Date(order.delivered_at) < endExclusive)
     && (!courierId || order.courier_id === courierId)
-    && (!allyId || order.ally_id === allyId));
+    && (!vehicleCategory || order.vehicle_category === vehicleCategory));
 }
 
 function bindScreenActions() {
@@ -2018,34 +2684,27 @@ function bindScreenActions() {
   if (createForm) createForm.addEventListener("submit", createOrder);
   const serviceForm = document.querySelector("#customer-service-form");
   if (serviceForm) serviceForm.addEventListener("submit", requestCustomerService);
-  const serviceType = document.querySelector("#service-type");
-  if (serviceType) serviceType.addEventListener("change", () => {
-    state.serviceDraft.serviceType = serviceType.value;
+  const vehicleCategory = document.querySelector("#vehicle-category");
+  if (vehicleCategory) vehicleCategory.addEventListener("change", () => {
+    state.serviceDraft.vehicleCategory = vehicleCategory.value;
     state.serviceDraft.fee = null;
     state.serviceDraft.distanceMeters = null;
-    document.querySelector("#transport-mode-field")?.classList.toggle("hidden", serviceType.value !== "traslado");
-    const calculateButton = document.querySelector('[data-action="calculate-route"]');
-    if (calculateButton) calculateButton.classList.toggle("hidden", serviceType.value !== "traslado");
+    state.serviceDraft.routeCoordinates = null;
+    state.serviceRouteLayer?.remove();
+    state.serviceRouteLayer = null;
     const quote = document.querySelector("#service-quote");
-    if (quote) quote.textContent = serviceType.value === "traslado"
-      ? "Selecciona ambos puntos y calcula la tarifa para ver el precio."
-      : "Soporte revisará y cotizará este servicio antes de asignarlo.";
-    const description = document.querySelector('#customer-service-form textarea[name="description"]');
-    if (description) description.placeholder = serviceType.value === "compra"
-      ? "Indica lo que necesitas comprar y, si aplica, cantidades o preferencias."
-      : serviceType.value === "encomienda"
-        ? "Describe el paquete y cualquier indicación para retirarlo o entregarlo."
-        : serviceType.value === "traslado"
-          ? "Indica cuántas personas o qué deseas trasladar."
-          : "Describe el pedido que deseas recibir.";
+    if (quote) quote.textContent = "El vehículo cambió. Vuelve a calcular la ruta y la tarifa.";
   });
   const transportMode = document.querySelector("#transport-mode");
   if (transportMode) transportMode.addEventListener("change", () => {
     state.serviceDraft.mode = transportMode.value;
     state.serviceDraft.fee = null;
     state.serviceDraft.distanceMeters = null;
+    state.serviceDraft.routeCoordinates = null;
+    state.serviceRouteLayer?.remove();
+    state.serviceRouteLayer = null;
     const quote = document.querySelector("#service-quote");
-    if (quote) quote.textContent = "La modalidad cambió. Vuelve a calcular la tarifa.";
+    if (quote) quote.textContent = "La modalidad cambió. Vuelve a calcular la ruta y la tarifa.";
   });
   for (const point of ["pickup", "destination"]) {
     const search = document.querySelector(`#${point}-search`);
@@ -2068,6 +2727,11 @@ function bindScreenActions() {
   }));
   document.querySelector('[data-action="use-current-location"]')?.addEventListener("click", requestCurrentPickupLocation);
   document.querySelector('[data-action="calculate-route"]')?.addEventListener("click", calculateServiceRoute);
+  const driverNavigation = document.querySelector("#driver-navigation");
+  if (driverNavigation) driverNavigation.addEventListener("change", () => {
+    state.driverNavigation = driverNavigation.value;
+    localStorage.setItem("enruta-navigation", driverNavigation.value);
+  });
   const kycForm = document.querySelector("#customer-kyc-form");
   if (kycForm) kycForm.addEventListener("submit", submitCustomerKyc);
   const applicationForm = document.querySelector("#service-application-form");
@@ -2112,7 +2776,7 @@ function bindScreenActions() {
       document.querySelector("#delivered-results").innerHTML = deliveredSummaryFor(orders);
     }
   }));
-  document.querySelectorAll("#report-from, #report-to, #report-courier, #report-ally").forEach((input) => input.addEventListener("change", () => {
+  document.querySelectorAll("#report-from, #report-to, #report-courier, #report-vehicle").forEach((input) => input.addEventListener("change", () => {
     document.querySelector("#report-table").innerHTML = reportTable(reportOrders());
   }));
   bindOrderActions();
@@ -2136,32 +2800,24 @@ function bindOrderActions() {
   }));
   document.querySelectorAll('[data-action="claim"]').forEach((button) => button.addEventListener("click", () => updateOrder(button.dataset.id, "claim_order")));
   document.querySelectorAll('[data-action="advance"]').forEach((button) => button.addEventListener("click", () => updateOrder(button.dataset.id, "advance_order", { next_status: button.dataset.status })));
+  document.querySelectorAll('[data-action="navigate-trip"]').forEach((button) => button.addEventListener("click", () => openTripNavigation(button.dataset.id)));
+  document.querySelectorAll('[data-action="share-trip"]').forEach((button) => button.addEventListener("click", () => createTripShareLink(button.dataset.id)));
+  document.querySelectorAll('[data-action="copy-trip-share"]').forEach((button) => button.addEventListener("click", async () => {
+    const share = state.tripShareLinks[button.dataset.id];
+    if (!share) return showToast("Genera un nuevo enlace para compartir el viaje.", true);
+    try {
+      await navigator.clipboard.writeText(share.url);
+      showToast("Enlace copiado. Envíalo solo a tu familiar de confianza.");
+    } catch (error) {
+      reportError(new Error(`No se pudo copiar el enlace: ${error.message}`));
+    }
+  }));
+  document.querySelectorAll('[data-action="revoke-trip-share"]').forEach((button) => button.addEventListener("click", () => revokeTripShareLink(button.dataset.id)));
   document.querySelectorAll('[data-action="assign"]').forEach((select) => select.addEventListener("change", () => {
     if (select.value) updateOrder(select.dataset.id, "assign_order", { target_courier: select.value });
   }));
   document.querySelectorAll('[data-action="release"]').forEach((button) => button.addEventListener("click", () => updateOrder(button.dataset.id, "release_order")));
   document.querySelectorAll('[data-action="cancel-order"]').forEach((button) => button.addEventListener("click", () => cancelOrder(button.dataset.id)));
-  document.querySelectorAll('[data-action="quote-service"]').forEach((button) => button.addEventListener("click", async () => {
-    const order = state.orders.find((item) => item.id === button.dataset.id);
-    const prompt = order?.service_type === "traslado"
-      ? "Revisa o ajusta la tarifa estimada del traslado en USD:"
-      : "Ingresa el costo del delivery en USD:";
-    const initialFee = order ? Number(order.delivery_fee).toFixed(2) : "";
-    const rawFee = window.prompt(prompt, initialFee);
-    if (rawFee === null) return;
-    const fee = Number(rawFee.replace(",", "."));
-    if (!Number.isFinite(fee) || fee < 0) return showToast("Ingresa un precio válido en USD.", true);
-    const courierId = document.querySelector(`[data-quote-courier="${button.dataset.id}"]`)?.value || null;
-    const { error } = await supabase.rpc("quote_customer_service_order", {
-      p_order_id: button.dataset.id,
-      p_delivery_fee: fee,
-      p_courier_id: courierId
-    });
-    if (error) return reportError(error);
-    showToast(courierId ? "Servicio cotizado y asignado al motorizado activo." : "Servicio cotizado y liberado para motorizados activos.");
-    await refreshData(false);
-    renderApp();
-  }));
   document.querySelectorAll('[data-action="private-file"]').forEach((button) => button.addEventListener("click", () => openPrivateFile(button)));
   document.querySelectorAll('[data-action="review-kyc"]').forEach((button) => button.addEventListener("click", () => reviewKyc(button)));
   document.querySelectorAll('[data-action="review-application"]').forEach((button) => button.addEventListener("click", () => reviewApplication(button)));
@@ -2193,7 +2849,11 @@ function bindOrderActions() {
     const earningsPercentage = percentageInput ? Number(percentageInput.value) : undefined;
     if (earningsPercentage !== undefined && (!Number.isFinite(earningsPercentage) || earningsPercentage < 0 || earningsPercentage > 100)) return showToast("El porcentaje debe estar entre 0 y 100.", true);
     const changes = { full_name, phone, role, approved: Boolean(role), ally_id: role === "aliado" ? allyId : null };
-    if (role === "motorizado" && earningsPercentage !== undefined) changes.earnings_percentage = earningsPercentage;
+    if (role === "motorizado") {
+      const vehicleCategory = document.querySelector(`[data-profile-vehicle="${id}"]`)?.value;
+      if (vehicleCategory) changes.vehicle_category = vehicleCategory;
+      if (earningsPercentage !== undefined) changes.earnings_percentage = earningsPercentage;
+    }
     updateProfile(id, changes);
   }));
   document.querySelectorAll('[data-action="suspend"]').forEach((button) => button.addEventListener("click", () => updateProfile(button.dataset.id, { suspended: button.dataset.suspended !== "true", online: false })));
@@ -2216,7 +2876,7 @@ async function toggleOnline(event) {
     stopCourierLocationTracking();
     state.courierLocations = state.courierLocations.filter((location) => location.courier_id !== state.profile.id);
   }
-  showToast(online ? "Estás activo. Se solicitará permiso de ubicación para aparecer en Monitoreo." : "Quedaste desconectado; tu ubicación fue retirada del monitoreo.");
+  showToast(online ? "Estás disponible. Se solicitará permiso de ubicación para aparecer en el mapa." : "Quedaste desconectado; tu ubicación fue retirada del mapa.");
   await refreshData(true);
   renderApp();
 }
@@ -2284,9 +2944,9 @@ async function deleteUser(id) {
 async function cancelOrder(id) {
   let reason = "";
   while (!reason.trim()) {
-    reason = window.prompt("Indica la razón de la cancelación del pedido:");
+    reason = window.prompt("Indica la razón de la cancelación del viaje:");
     if (reason === null) return;
-    if (!reason.trim()) showToast("Debes indicar una razón para cancelar el pedido.", true);
+    if (!reason.trim()) showToast("Debes indicar una razón para cancelar el viaje.", true);
   }
   await updateOrder(id, "cancel_order", { p_reason: reason.trim() });
 }
@@ -2307,7 +2967,7 @@ async function updateOrder(id, action, args = {}) {
     }
     return reportError(error);
   }
-  showToast(action === "claim_order" ? "Pedido asignado a tu cuenta." : action === "assign_order" ? "Pedido asignado al motorizado." : action === "release_order" ? "Pedido liberado para motorizados activos." : "Estado del pedido actualizado.");
+  showToast(action === "claim_order" ? "Viaje asignado a tu cuenta." : action === "assign_order" ? "Viaje asignado al conductor." : action === "release_order" ? "Viaje liberado para conductores activos." : "Estado del viaje actualizado.");
   if (action === "claim_order") stopCourierAlarm(id);
   await refreshData(true);
   renderApp();
@@ -2324,27 +2984,28 @@ async function updateProfile(id, changes) {
 
 function exportReport() {
   const columns = [
-    ["Aliado / servicio", (order) => order.allies?.name || order.service_type || ""],
-    ["Cliente", (order) => order.client_name],
+    ["Pasajero", (order) => order.client_name],
+    ["Vehículo", (order) => order.vehicle_category === "carro" ? "Carro" : "Moto"],
+    ["Modalidad", (order) => order.transport_mode === "express" ? "Express" : "Económica"],
     ["Descripción", (order) => order.description || ""],
-    ["Direccion", (order) => order.address],
-    ["Motorizado", (order) => order.courier?.full_name || ""],
-    ["Creado por", (order) => order.creator?.full_name || order.creator_name || ""],
-    ["Hora llegada comercio", (order) => order.at_store_at ? new Date(order.at_store_at).toLocaleTimeString("es-CO") : ""],
-    ["Hora entrega", (order) => order.delivered_at ? new Date(order.delivered_at).toLocaleTimeString("es-CO") : ""],
+    ["Recogida", (order) => order.pickup_address || ""],
+    ["Destino", (order) => order.destination_address || ""],
+    ["Conductor", (order) => order.courier?.full_name || order.courier_name || ""],
+    ["Hora de recogida", (order) => order.at_store_at ? new Date(order.at_store_at).toLocaleTimeString("es-CO") : ""],
+    ["Hora de finalización", (order) => order.delivered_at ? new Date(order.delivered_at).toLocaleTimeString("es-CO") : ""],
     ["Fecha", (order) => order.delivered_at ? new Date(order.delivered_at).toLocaleDateString("es-CO") : ""],
-    ["Costo delivery", (order) => order.delivery_fee],
+    ["Tarifa", (order) => order.delivery_fee],
     ["Moneda", (order) => order.currency || "COP"]
   ];
   const xmlEscape = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]);
   const rows = [
     `<Row>${columns.map(([title]) => `<Cell><Data ss:Type="String">${xmlEscape(title)}</Data></Cell>`).join("")}</Row>`,
-    ...reportOrders().map((order) => `<Row>${columns.map(([title, value]) => `<Cell><Data ss:Type="${title === "Costo delivery" ? "Number" : "String"}">${xmlEscape(title === "Motorizado" ? (order.courier?.full_name || order.courier_name || "") : value(order))}</Data></Cell>`).join("")}</Row>`)
+    ...reportOrders().map((order) => `<Row>${columns.map(([title, value]) => `<Cell><Data ss:Type="${title === "Tarifa" ? "Number" : "String"}">${xmlEscape(value(order))}</Data></Cell>`).join("")}</Row>`)
   ].join("");
-  const workbook = `<?xml version="1.0" encoding="UTF-8"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Entregas"><Table>${rows}</Table></Worksheet></Workbook>`;
+  const workbook = `<?xml version="1.0" encoding="UTF-8"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Viajes"><Table>${rows}</Table></Worksheet></Workbook>`;
   const link = document.createElement("a");
   link.href = URL.createObjectURL(new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" }));
-  link.download = "reporte-a-un-paso.xls";
+  link.download = "reporte-enruta2.xls";
   link.click();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
@@ -2361,11 +3022,12 @@ async function signOut() {
     if (availabilityError) console.error("No se pudo cerrar la disponibilidad antes de salir:", availabilityError);
   }
   stopCourierLocationTracking();
+  destroyMonitoringMap();
   destroyServiceMap();
   state.customerKyc = null;
   state.kycSubmissions = [];
   state.serviceApplications = [];
-  state.serviceDraft = { pickup: null, destination: null, activePoint: "pickup", mode: "express", serviceType: "traslado", distanceMeters: null, fee: null };
+  state.serviceDraft = { pickup: null, destination: null, activePoint: "pickup", vehicleCategory: "carro", mode: "express", serviceType: "traslado", distanceMeters: null, fee: null, routeCoordinates: null };
   if (state.realtime) {
     await supabase.removeChannel(state.realtime);
     state.realtime = null;
